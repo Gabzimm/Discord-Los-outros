@@ -5,6 +5,54 @@ import asyncio
 from datetime import datetime
 import re
 
+# ========== CONFIGURAÇÃO DE CARGOS (COM IDS REAIS) ==========
+CARGOS_CONFIG = {
+    "👑 Lider 00": 1474880677827579935,
+    "💎 Lider 01": 1474880748803723294,
+    "👮 Lider 02": 1474880750909128874,
+    "🎖️ Lider 03": 1474880752566014156,
+    "🎖️ Gerente Geral": 1474880754214371539,
+    "🎖️ Gerente De Farm": 1474880755078533241,
+    "🎖️ Gerente De Pista": 1474880756026179825,
+    "🎖️ Gerente de Recrutamento": 1474880756433162353,
+    "🎖️ Supervisor": 1474880757385134130,
+    "🎖️ Recrutador": 1474880757984923708,
+    "🎖️ Ceo Elite": 1474881051569688656,
+    "🎖️ Sub Elite": 1474881053108731945,
+    "🎖️ Elite": 1474881054300180631,
+    "👤 Membro": 1474669904547549265,
+}
+
+# Mapeamento de prefixos visuais para os cargos
+PREFIXO_PARA_CARGO = {
+    "00": "👑 Lider 00",
+    "01": "💎 Lider 01",
+    "02": "👮 Lider 02",
+    "03": "🎖️ Lider 03",
+    "G.Geral": "🎖️ Gerente Geral",
+    "G.Farm": "🎖️ Gerente De Farm",
+    "G.Pista": "🎖️ Gerente De Pista",
+    "G.Rec": "🎖️ Gerente de Recrutamento",
+    "Sup": "🎖️ Supervisor",
+    "Rec": "🎖️ Recrutador",
+    "Ceo E": "🎖️ Ceo Elite",
+    "Sub E": "🎖️ Sub Elite",
+    "E": "🎖️ Elite",
+    "M": "👤 Membro",
+}
+
+# Ordem de prioridade visual
+PREFIXOS_VISUAIS = [
+    "00", "01", "02", "03", "G.Geral", "G.Farm", "G.Pista", "G.Rec",
+    "Sup", "Rec", "Ceo E", "Sub E", "E", "M"
+]
+
+# Cargos que podem usar o painel (staff)
+STAFF_PREFIXOS = [
+    "00", "01", "02", "03", "G.Geral", "G.Farm", "G.Pista", "G.Rec",
+    "Sup", "Rec", "Ceo E", "Sub E"
+]
+
 # ========== CONFIGURAÇÃO DE NICKNAMES ==========
 NICKNAME_CONFIG = {
     "00": "00 | {name} | {id}",
@@ -23,47 +71,44 @@ NICKNAME_CONFIG = {
     "M": "M | {name} | {id}",
 }
 
-# Ordem de prioridade (do maior para o menor)
-ORDEM_PRIORIDADE = [
-    "00", "01", "02", "03", "G.Geral", "G.Farm", "G.Pista", "G.Rec",
-    "Sup", "Rec", "Ceo E", "Sub E", "E", "M"
-]
-
-# Cargos que podem usar o painel (staff)
-STAFF_ROLES = [
-    "00", "01", "02", "03", "G.Geral", "G.Farm", "G.Pista", "G.Rec",
-    "Sup", "Rec", "Ceo E", "Sub E"
-]
-
 # ========== FUNÇÕES AUXILIARES ==========
+def get_cargo_por_prefixo(guild: discord.Guild, prefixo: str):
+    """Retorna o objeto cargo baseado no prefixo"""
+    if prefixo not in PREFIXO_PARA_CARGO:
+        return None
+    
+    nome_cargo = PREFIXO_PARA_CARGO[prefixo]
+    cargo_id = CARGOS_CONFIG.get(nome_cargo)
+    
+    if cargo_id:
+        return guild.get_role(cargo_id)
+    return None
+
+def get_prefixo_por_cargo(role: discord.Role) -> str:
+    """Retorna o prefixo baseado no cargo"""
+    for prefixo, nome_cargo in PREFIXO_PARA_CARGO.items():
+        if role.name == nome_cargo or role.id == CARGOS_CONFIG.get(nome_cargo):
+            return prefixo
+    return None
+
 def extrair_parte_nickname(nickname: str):
-    """Extrai a parte do nome do usuário (antes do ' | ') ignorando prefixos"""
+    """Extrai a parte do nome do usuário"""
     if not nickname:
         return "User"
     
-    # Dividir por ' | '
     partes = nickname.split(' | ')
-    
-    # Se tiver 3 partes: "PREFIXO | NOME | ID"
     if len(partes) >= 2:
         return partes[1].strip()
-    
-    # Se tiver 2 partes: "NOME | ID"
-    if len(partes) == 2:
-        return partes[0].strip()
     
     return nickname.strip()
 
 def extrair_id_fivem(nickname: str):
-    """Extrai ID do FiveM do nickname (últimos números após o último ' | ')"""
+    """Extrai ID do FiveM do nickname"""
     if not nickname:
         return None
     
-    # Dividir por ' | '
     partes = nickname.split(' | ')
-    
-    # Se tiver pelo menos 2 partes, a última pode ser o ID
-    if len(partes) >= 2:
+    if len(partes) >= 3:
         ultima_parte = partes[-1].strip()
         if ultima_parte.isdigit():
             return ultima_parte
@@ -71,160 +116,17 @@ def extrair_id_fivem(nickname: str):
     return None
 
 def extrair_prefixo_visual(nickname: str):
-    """Extrai o prefixo visual do nickname (primeira parte antes do primeiro ' | ')"""
+    """Extrai o prefixo visual do nickname"""
     if not nickname:
         return None
     
     partes = nickname.split(' | ')
     if partes:
-        return partes[0].strip()
+        prefixo = partes[0].strip()
+        if prefixo in PREFIXOS_VISUAIS:
+            return prefixo
     
     return None
-
-async def atribuir_cargo_por_prefixo(member: discord.Member, prefixo: str):
-    """Atribui o cargo real baseado no prefixo visual usando o config_cargos"""
-    try:
-        # Buscar o gerenciador de cargos
-        cog = member.guild.get_cog("CargosManagerCog")
-        if not cog:
-            print("⚠️ CargosManagerCog não encontrado!")
-            return False
-        
-        manager = cog.manager
-        
-        # Mapeamento de prefixos visuais para possíveis nomes de cargos reais
-        # O config_cargos vai buscar o cargo mais similar
-        prefixo_para_cargo = {
-            "00": ["00", "Dono", "Owner", "Fundador"],
-            "01": ["01", "Subdono", "Co-Fundador"],
-            "02": ["02", "Subdono 2", "Co-Owner"],
-            "03": ["03", "Subdono 3", "Co-Owner"],
-            "G.Geral": ["G.Geral", "Gerente Geral", "General Manager"],
-            "G.Farm": ["G.Farm", "Gerente de Farm", "Farm Manager"],
-            "G.Pista": ["G.Pista", "Gerente de Pista", "Track Manager"],
-            "G.Rec": ["G.Rec", "Gerente de Recrutamento", "Recruitment Manager"],
-            "Sup": ["Sup", "Supervisor", "Supervisor"],
-            "Rec": ["Rec", "Recrutador", "Recruiter"],
-            "Ceo E": ["Ceo E", "CEO Elite", "CEO"],
-            "Sub E": ["Sub E", "Sub Elite", "Sub CEO"],
-            "E": ["E", "Elite", "Elite"],
-            "M": ["M", "Membro", "Member"],
-        }
-        
-        if prefixo not in prefixo_para_cargo:
-            return False
-        
-        # Tentar encontrar o cargo real no servidor
-        cargos_possiveis = prefixo_para_cargo[prefixo]
-        cargo_encontrado = None
-        
-        for nome_cargo in cargos_possiveis:
-            cargo = manager.get_cargo_por_nome(member.guild.id, nome_cargo)
-            if cargo:
-                cargo_encontrado = cargo
-                break
-        
-        if not cargo_encontrado:
-            print(f"⚠️ Nenhum cargo encontrado para o prefixo {prefixo}")
-            return False
-        
-        # Verificar se o membro já tem o cargo
-        if cargo_encontrado in member.roles:
-            return True
-        
-        # Atribuir o cargo
-        await member.add_roles(cargo_encontrado)
-        print(f"✅ Cargo {cargo_encontrado.name} atribuído para {member.name} baseado no prefixo {prefixo}")
-        return True
-        
-    except Exception as e:
-        print(f"Erro ao atribuir cargo por prefixo: {e}")
-        return False
-
-async def atualizar_nickname(member: discord.Member):
-    """Atualiza nickname baseado no cargo principal usando config_cargos"""
-    try:
-        # Verificar permissões
-        if not member.guild.me.guild_permissions.manage_nicknames:
-            return False
-        
-        # Buscar o gerenciador de cargos
-        cog = member.guild.get_cog("CargosManagerCog")
-        if not cog:
-            print("⚠️ CargosManagerCog não encontrado!")
-            return False
-        
-        manager = cog.manager
-        
-        # Extrair partes do nickname atual
-        nickname_atual = member.nick or member.name
-        parte_nome = extrair_parte_nickname(nickname_atual)
-        id_fivem = extrair_id_fivem(nickname_atual)
-        
-        # Se não tiver ID, usar placeholder
-        if not id_fivem:
-            id_fivem = "000000"
-        
-        # Determinar o prefixo visual baseado nos cargos REAIS do membro
-        prefixo_visual = "M"  # Padrão
-        
-        # Mapeamento de cargos REAIS para prefixos VISUAIS
-        # O config_cargos vai ajudar a encontrar correspondências
-        cargo_para_prefixo = {
-            "00": "00", "Dono": "00", "Owner": "00", "Fundador": "00",
-            "01": "01", "Subdono": "01", "Co-Fundador": "01",
-            "02": "02", "Subdono 2": "02",
-            "03": "03", "Subdono 3": "03",
-            "G.Geral": "G.Geral", "Gerente Geral": "G.Geral",
-            "G.Farm": "G.Farm", "Gerente de Farm": "G.Farm",
-            "G.Pista": "G.Pista", "Gerente de Pista": "G.Pista",
-            "G.Rec": "G.Rec", "Gerente de Recrutamento": "G.Rec",
-            "Sup": "Sup", "Supervisor": "Sup",
-            "Rec": "Rec", "Recrutador": "Rec",
-            "Ceo E": "Ceo E", "CEO Elite": "Ceo E",
-            "Sub E": "Sub E", "Sub Elite": "Sub E",
-            "E": "E", "Elite": "E",
-            "M": "M", "Membro": "M", "Member": "M",
-        }
-        
-        # Obter hierarquia do servidor (do maior para o menor)
-        hierarquia = manager.get_hierarquia(member.guild.id)
-        
-        if hierarquia:
-            # Percorrer cargos da hierarquia (do maior para o menor)
-            for cargo_real in hierarquia:
-                if cargo_real in member.roles:
-                    # Verificar se este cargo real corresponde a algum prefixo
-                    for nome_real, prefixo in cargo_para_prefixo.items():
-                        if nome_real.lower() in cargo_real.name.lower():
-                            prefixo_visual = prefixo
-                            break
-                    if prefixo_visual != "M":
-                        break
-        
-        # Gerar novo nickname
-        template = NICKNAME_CONFIG.get(prefixo_visual, NICKNAME_CONFIG["M"])
-        novo_nick = template.format(name=parte_nome, id=id_fivem)
-        
-        # Limitar a 32 caracteres
-        if len(novo_nick) > 32:
-            novo_nick = novo_nick[:32]
-        
-        # Aplicar se for diferente
-        if member.nick != novo_nick:
-            await member.edit(nick=novo_nick)
-            
-            # Após mudar o nickname, verificar se precisa atribuir cargo baseado no prefixo
-            novo_prefixo = extrair_prefixo_visual(novo_nick)
-            if novo_prefixo:
-                await atribuir_cargo_por_prefixo(member, novo_prefixo)
-            
-            return True
-            
-    except Exception as e:
-        print(f"Erro ao atualizar nickname: {e}")
-    
-    return False
 
 def usuario_pode_usar_painel(member: discord.Member) -> bool:
     """Verifica se o usuário pode usar o painel de cargos"""
@@ -237,60 +139,72 @@ def usuario_pode_usar_painel(member: discord.Member) -> bool:
     
     # Verificar se tem cargo staff
     for role in member.roles:
-        if role.name in STAFF_ROLES:
+        prefixo = get_prefixo_por_cargo(role)
+        if prefixo in STAFF_PREFIXOS:
             return True
+    
+    return False
+
+async def atualizar_nickname(member: discord.Member):
+    """Atualiza nickname baseado no cargo principal"""
+    try:
+        # Verificar permissões
+        if not member.guild.me.guild_permissions.manage_nicknames:
+            return False
+        
+        # Extrair partes do nickname atual
+        nickname_atual = member.nick or member.name
+        parte_nome = extrair_parte_nickname(nickname_atual)
+        id_fivem = extrair_id_fivem(nickname_atual)
+        
+        # Se não tiver ID, usar placeholder
+        if not id_fivem:
+            id_fivem = "000000"
+        
+        # Determinar o prefixo visual baseado nos cargos do membro
+        prefixo_visual = "M"  # Padrão
+        
+        # Verificar cargos do membro (do maior para o menor)
+        for role in sorted(member.roles, key=lambda r: r.position, reverse=True):
+            prefixo = get_prefixo_por_cargo(role)
+            if prefixo:
+                prefixo_visual = prefixo
+                break
+        
+        # Gerar novo nickname
+        template = NICKNAME_CONFIG.get(prefixo_visual, NICKNAME_CONFIG["M"])
+        novo_nick = template.format(name=parte_nome, id=id_fivem)
+        
+        # Limitar a 32 caracteres
+        if len(novo_nick) > 32:
+            novo_nick = novo_nick[:32]
+        
+        # Aplicar se for diferente
+        if member.nick != novo_nick:
+            await member.edit(nick=novo_nick)
+            return True
+            
+    except Exception as e:
+        print(f"Erro ao atualizar nickname: {e}")
     
     return False
 
 # ========== SISTEMA DE SELEÇÃO DE CARGO ==========
 class CargoSelectView(ui.View):
-    """View para selecionar cargo usando config_cargos"""
+    """View para selecionar cargo"""
     def __init__(self, member: discord.Member, action: str):
         super().__init__(timeout=60)
         self.member = member
         self.action = action  # "add" ou "remove"
         
-        # Buscar gerenciador de cargos
-        cog = member.guild.get_cog("CargosManagerCog")
-        self.manager = cog.manager if cog else None
-        
         # Opções de cargo
         options = []
-        for prefixo in ORDEM_PRIORIDADE:
-            desc = ""
-            if prefixo == "00":
-                desc = "Dono"
-            elif prefixo == "01":
-                desc = "Subdono"
-            elif prefixo == "02":
-                desc = "Subdono 2"
-            elif prefixo == "03":
-                desc = "Subdono 3"
-            elif prefixo == "G.Geral":
-                desc = "Gerente Geral"
-            elif prefixo == "G.Farm":
-                desc = "Gerente de Farm"
-            elif prefixo == "G.Pista":
-                desc = "Gerente de Pista"
-            elif prefixo == "G.Rec":
-                desc = "Gerente de Recrutamento"
-            elif prefixo == "Sup":
-                desc = "Supervisor"
-            elif prefixo == "Rec":
-                desc = "Recrutador"
-            elif prefixo == "Ceo E":
-                desc = "CEO Elite"
-            elif prefixo == "Sub E":
-                desc = "Sub Elite"
-            elif prefixo == "E":
-                desc = "Elite"
-            elif prefixo == "M":
-                desc = "Membro"
-            
+        for prefixo in PREFIXOS_VISUAIS:
+            nome_cargo = PREFIXO_PARA_CARGO.get(prefixo, "Desconhecido")
             options.append(
                 discord.SelectOption(
                     label=prefixo,
-                    description=desc
+                    description=nome_cargo
                 )
             )
         
@@ -306,59 +220,21 @@ class CargoSelectView(ui.View):
         await interaction.response.defer(ephemeral=True)
         
         prefixo = self.select.values[0]
+        cargo = get_cargo_por_prefixo(interaction.guild, prefixo)
         
-        # Buscar cargo usando o manager baseado no prefixo
-        if not self.manager:
-            msg = await interaction.followup.send("❌ Gerenciador de cargos não disponível!", ephemeral=True)
-            await asyncio.sleep(5)
-            await msg.delete()
-            return
-        
-        # Mapear prefixo para possíveis nomes de cargo
-        prefixo_para_cargo = {
-            "00": ["00", "Dono", "Owner", "Fundador"],
-            "01": ["01", "Subdono", "Co-Fundador"],
-            "02": ["02", "Subdono 2", "Co-Owner"],
-            "03": ["03", "Subdono 3", "Co-Owner"],
-            "G.Geral": ["G.Geral", "Gerente Geral", "General Manager"],
-            "G.Farm": ["G.Farm", "Gerente de Farm", "Farm Manager"],
-            "G.Pista": ["G.Pista", "Gerente de Pista", "Track Manager"],
-            "G.Rec": ["G.Rec", "Gerente de Recrutamento", "Recruitment Manager"],
-            "Sup": ["Sup", "Supervisor", "Supervisor"],
-            "Rec": ["Rec", "Recrutador", "Recruiter"],
-            "Ceo E": ["Ceo E", "CEO Elite", "CEO"],
-            "Sub E": ["Sub E", "Sub Elite", "Sub CEO"],
-            "E": ["E", "Elite", "Elite"],
-            "M": ["M", "Membro", "Member"],
-        }
-        
-        if prefixo not in prefixo_para_cargo:
-            msg = await interaction.followup.send(f"❌ Prefixo {prefixo} não mapeado!", ephemeral=True)
-            await asyncio.sleep(5)
-            await msg.delete()
-            return
-        
-        # Tentar encontrar o cargo
-        cargo_encontrado = None
-        for nome_cargo in prefixo_para_cargo[prefixo]:
-            cargo = self.manager.get_cargo_por_nome(interaction.guild.id, nome_cargo)
-            if cargo:
-                cargo_encontrado = cargo
-                break
-        
-        if not cargo_encontrado:
-            msg = await interaction.followup.send(f"❌ Nenhum cargo encontrado para o prefixo {prefixo}!", ephemeral=True)
+        if not cargo:
+            msg = await interaction.followup.send(f"❌ Cargo para prefixo {prefixo} não encontrado!", ephemeral=True)
             await asyncio.sleep(5)
             await msg.delete()
             return
         
         try:
             if self.action == "add":
-                await self.member.add_roles(cargo_encontrado)
-                mensagem = f"✅ Cargo `{cargo_encontrado.name}` adicionado para {self.member.mention}"
+                await self.member.add_roles(cargo)
+                mensagem = f"✅ Cargo `{cargo.name}` adicionado para {self.member.mention}"
             else:
-                await self.member.remove_roles(cargo_encontrado)
-                mensagem = f"✅ Cargo `{cargo_encontrado.name}` removido de {self.member.mention}"
+                await self.member.remove_roles(cargo)
+                mensagem = f"✅ Cargo `{cargo.name}` removido de {self.member.mention}"
             
             # Atualizar nickname
             await atualizar_nickname(self.member)
@@ -403,16 +279,6 @@ class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
             await asyncio.sleep(5)
             await msg.delete()
             return
-        
-        # Buscar gerenciador de cargos
-        cog = interaction.guild.get_cog("CargosManagerCog")
-        if not cog:
-            msg = await interaction.followup.send("❌ Gerenciador de cargos não disponível!", ephemeral=True)
-            await asyncio.sleep(5)
-            await msg.delete()
-            return
-        
-        manager = cog.manager
         
         # Encontrar usuário
         member = None
@@ -466,7 +332,7 @@ class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
                 await msg.delete()
                 return
             
-            # Extrair ID do FiveM do nickname
+            # Extrair informações do nickname
             id_fivem = extrair_id_fivem(member.nick or member.name)
             prefixo_atual = extrair_prefixo_visual(member.nick or member.name)
             
@@ -505,7 +371,6 @@ class CleanCargoView(ui.View):
     
     @ui.button(label="➕ Add Cargo", style=ButtonStyle.green, emoji="➕", custom_id="add_cargo_clean")
     async def add_cargo(self, interaction: discord.Interaction, button: ui.Button):
-        # Verificar staff
         if not usuario_pode_usar_painel(interaction.user):
             await interaction.response.send_message("❌ Apenas staff pode usar!", ephemeral=True)
             return
@@ -515,7 +380,6 @@ class CleanCargoView(ui.View):
     
     @ui.button(label="➖ Rem Cargo", style=ButtonStyle.red, emoji="➖", custom_id="remove_cargo_clean")
     async def remove_cargo(self, interaction: discord.Interaction, button: ui.Button):
-        # Verificar staff
         if not usuario_pode_usar_painel(interaction.user):
             await interaction.response.send_message("❌ Apenas staff pode usar!", ephemeral=True)
             return
@@ -525,14 +389,12 @@ class CleanCargoView(ui.View):
     
     @ui.button(label="🔄 Corrigir Nick", style=ButtonStyle.blurple, emoji="🔄", custom_id="fix_nick_clean")
     async def fix_nick(self, interaction: discord.Interaction, button: ui.Button):
-        # Verificar staff
         if not usuario_pode_usar_painel(interaction.user):
             await interaction.response.send_message("❌ Apenas staff pode usar!", ephemeral=True)
             return
         
         await interaction.response.defer(ephemeral=True)
         
-        # Corrigir nickname do próprio usuário
         success = await atualizar_nickname(interaction.user)
         
         if success:
@@ -598,8 +460,8 @@ class CargosCog(commands.Cog):
         
         # Lista de cargos disponíveis
         cargos_text = ""
-        for cargo in ORDEM_PRIORIDADE:
-            cargos_text += f"• {cargo}\n"
+        for prefixo in PREFIXOS_VISUAIS:
+            cargos_text += f"• {prefixo}\n"
         
         embed.add_field(
             name="📋 Cargos Disponíveis",
@@ -607,9 +469,14 @@ class CargosCog(commands.Cog):
             inline=True
         )
         
+        # Lista de staff
+        staff_text = ""
+        for prefixo in STAFF_PREFIXOS:
+            staff_text += f"• {prefixo}\n"
+        
         embed.add_field(
             name="👑 Staff Permitido",
-            value="\n".join(STAFF_ROLES[:10]),
+            value=staff_text,
             inline=True
         )
         
@@ -626,7 +493,6 @@ class CargosCog(commands.Cog):
         if member is None:
             member = ctx.author
         
-        # Verificar staff (só staff pode corrigir outros)
         if member != ctx.author and not usuario_pode_usar_painel(ctx.author):
             await ctx.send("❌ Você não tem permissão para corrigir nickname de outros!", delete_after=5)
             return
