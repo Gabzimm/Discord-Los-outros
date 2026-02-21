@@ -70,11 +70,9 @@ async def load_cogs():
     print("=" * 50)
     print("🔄 CARREGANDO MÓDULOS...")
     
-    # Lista de módulos
     cogs = [
-        'config_cargos.py',
         'modules.tickets',
-        'modules.sets.py',
+        'modules.sets',
         'modules.cargos',
     ]
     
@@ -85,17 +83,24 @@ async def load_cogs():
             await bot.load_extension(cog)
             print(f"✅ '{cog}' carregado!")
             carregados += 1
-        except ModuleNotFoundError:
-            print(f"⚠️ Módulo não encontrado")
+        except ModuleNotFoundError as e:
+            print(f"❌ ModuleNotFoundError: {e}")
+            print(f"   → O arquivo {cog}.py não foi encontrado na pasta modules/")
         except ImportError as e:
-            print(f"❌ Erro de importação: {e}")
+            print(f"❌ ImportError: {e}")
+            print(f"   → Erro ao importar {cog}")
+        except commands.ExtensionNotFound as e:
+            print(f"❌ ExtensionNotFound: {e}")
+            print(f"   → Extensão {cog} não encontrada")
+        except commands.ExtensionFailed as e:
+            print(f"❌ ExtensionFailed: {e}")
+            print(f"   → {e.original}")  # Mostra o erro original
         except Exception as e:
-            print(f"❌ Erro: {type(e).__name__}: {e}")
+            print(f"❌ Erro inesperado: {type(e).__name__}: {e}")
     
     print(f"\n📊 {carregados}/{len(cogs)} módulos carregados")
     print("=" * 50)
     return carregados > 0
-
 # ==================== EVENTOS ====================
 @bot.event
 async def on_ready():
