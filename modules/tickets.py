@@ -437,24 +437,18 @@ class TicketsCog(commands.Cog):
         embed_info = discord.Embed(
             title="🎫 **SISTEMA DE TICKETS**",
             description=(
-                f"**Cargo Base:** {cargo_base.mention} (ID: `{CARGO_BASE_ID}`)\n"
-                f"**Cargos com acesso ao painel:** {len(cargos_permitidos)}\n\n"
-                "**📌 Regras de acesso:**\n"
-                "• Quem pode ver o painel de controle?\n"
-                f"• Cargos com posição >= {cargo_base.name}\n"
-                "• Administradores sempre podem\n\n"
                 "**Clique no botão abaixo para abrir um ticket**\n\n"
                 "Escolha esta opção se você precisa de ajuda com:\n"
-                "• Problemas no servidor\n"
-                "• Dúvidas sobre cargos\n"
+                "• Duvidas privadas\n"
+                "• Entrga de farm\n"
                 "• Reportar jogadores\n"
-                "• Outras questões importantes"
+                "• Outras questões importante"
             ),
             color=discord.Color.purple()
         )
         
         embed_info.set_image(url="")
-        embed_info.set_footer(text="Hospital APP • Suporte 24h")
+        embed_info.set_footer(text="Sistema de ticket • WaveX")
         
         view = TicketOpenView()
         
