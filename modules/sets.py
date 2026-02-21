@@ -170,7 +170,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
     recrutador = ui.TextInput(
         label="3. ID de quem te recrutou:",
         placeholder="Ex: 9237 (opcional)",
-        required=False,
+        required=True,
         max_length=20
     )
     
