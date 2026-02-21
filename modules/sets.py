@@ -6,53 +6,34 @@ from datetime import datetime
 import re
 
 # ========== CONFIGURAÇÃO ==========
-# ID do cargo base para aprovação (deste pra cima podem aprovar)
 CARGO_BASE_APROVACAO_ID = 1421254143103996045
 
+# Dicionário para armazenar o canal de aprovação de cada servidor
+# Formato: {guild_id: channel_id}
+canais_aprovacao = {}
+
 def usuario_pode_aprovar(member: discord.Member) -> bool:
-    """Verifica se o usuário pode aprovar sets baseado no cargo"""
     if not member:
         return False
-    
-    # Admin sempre pode
     if member.guild_permissions.administrator:
         return True
-    
-    # Buscar o cargo base
     cargo_base = member.guild.get_role(CARGO_BASE_APROVACAO_ID)
     if not cargo_base:
-        print(f"⚠️ Cargo base ID {CARGO_BASE_APROVACAO_ID} não encontrado!")
         return False
-    
-    # Verificar se o membro tem algum cargo com posição >= cargo_base
     for role in member.roles:
         if role.position >= cargo_base.position:
             return True
-    
     return False
 
 def buscar_usuario_por_id_fivem(guild: discord.Guild, fivem_id: str) -> discord.Member:
-    """Busca usuário pelo ID do FiveM no nickname"""
     for member in guild.members:
-        if member.nick:
-            # Padrão: "M | nome | 123456" 
-            if member.nick.endswith(f" | {fivem_id}"):
-                return member
-    return None
-
-def extrair_id_fivem_do_nickname(nickname: str) -> str:
-    """Extrai ID do FiveM do nickname no formato M | nome | id"""
-    if not nickname:
-        return None
-    match = re.search(r' \| (\d+)$', nickname)
-    if match:
-        return match.group(1)
+        if member.nick and member.nick.endswith(f" | {fivem_id}"):
+            return member
     return None
 
 # ========== CLASSES DO SISTEMA DE SET ==========
 
 class SetStaffView(ui.View):
-    """View com botões para staff aprovar/recusar set"""
     def __init__(self, fivem_id, game_nick, user_id, discord_user, recrutador_id=None, recrutador_nome=None):
         super().__init__(timeout=None)
         self.fivem_id = fivem_id
@@ -71,35 +52,27 @@ class SetStaffView(ui.View):
         await interaction.response.defer()
         
         try:
-            # Buscar membro
             member = interaction.guild.get_member(self.user_id)
-            
             if not member:
                 await interaction.followup.send(f"❌ Usuário não encontrado! ID: `{self.user_id}`", ephemeral=True)
                 return
             
-            # NOVO FORMATO: M | nome | id
             novo_nick = f"M | {self.game_nick} | {self.fivem_id}"
             if len(novo_nick) > 32:
-                # Se muito longo, encurtar o nome
                 nome_curto = self.game_nick[:15]
                 novo_nick = f"M | {nome_curto} | {self.fivem_id}"
             
-            # Mudar nickname
             await member.edit(nick=novo_nick)
             print(f"✅ Nickname alterado para: {novo_nick}")
             
-            # NOVO CARGO: 🙅‍♂️ | Membro
             membro_role = discord.utils.get(interaction.guild.roles, name="🙅‍♂️ | Membro")
             if not membro_role:
-                # Tentar sem emoji
                 membro_role = discord.utils.get(interaction.guild.roles, name="Membro")
             
             if membro_role:
                 await member.add_roles(membro_role)
                 print(f"✅ Cargo '🙅‍♂️ | Membro' adicionado a {member.name}")
             
-            # Embed de aprovação
             embed_aprovado = discord.Embed(
                 title="✅ SET APROVADO!",
                 description=(
@@ -112,12 +85,8 @@ class SetStaffView(ui.View):
                 color=discord.Color.green()
             )
             
-            # Se tiver recrutador, adicionar ao embed e ao sistema de contagem
             if self.recrutador_nome and self.recrutador_id:
                 embed_aprovado.description += f"**🤝 Recrutado por:** {self.recrutador_nome} (ID: `{self.recrutador_id}`)\n"
-                
-                # 🔗 PONTE PARA MÓDULO DE RECRUTAMENTOS
-                # Disparar evento para o módulo de recrutamentos (se existir)
                 interaction.client.dispatch('recrutamento_contabilizar', {
                     'recrutador_id': self.recrutador_id,
                     'recrutador_nome': self.recrutador_nome,
@@ -126,14 +95,11 @@ class SetStaffView(ui.View):
                     'data': datetime.now().isoformat()
                 })
             
-            # Adicionar informações do novo formato
             embed_aprovado.description += f"\n✅ **Novo formato:** `{novo_nick}`\n✅ **Cargo:** 🙅‍♂️ | Membro"
             
-            # Remover botões
             self.clear_items()
             await interaction.message.edit(embed=embed_aprovado, view=self)
             
-            # Confirmação
             await interaction.followup.send(
                 f"✅ Set de {member.mention} aprovado!\n"
                 f"• Nickname: `{novo_nick}`\n"
@@ -141,7 +107,6 @@ class SetStaffView(ui.View):
                 ephemeral=True
             )
             
-            # DM para o usuário
             try:
                 embed_dm = discord.Embed(
                     title="✅ SEU SET FOI APROVADO!",
@@ -161,15 +126,6 @@ class SetStaffView(ui.View):
             except:
                 pass
                 
-        except discord.Forbidden as e:
-            print(f"❌ Erro de permissão: {e}")
-            await interaction.followup.send(
-                "❌ **ERRO DE PERMISSÃO!**\n\n"
-                "Verifique:\n"
-                "1. O bot tem 'Gerenciar Apelidos' e 'Gerenciar Cargos'\n"
-                "2. O cargo do bot está ACIMA dos cargos que ele gerencia",
-                ephemeral=True
-            )
         except Exception as e:
             print(f"❌ Erro ao aprovar set: {type(e).__name__}: {e}")
             await interaction.followup.send(f"❌ Erro: {type(e).__name__}: {e}", ephemeral=True)
@@ -202,18 +158,12 @@ class SetStaffView(ui.View):
             
             await interaction.channel.send(embed=embed_recusado)
             await mensagem_pedido.delete()
-            
             await interaction.followup.send("✅ Set recusado e mensagem excluída!", ephemeral=True)
-            print(f"✅ Set recusado - ID Fivem: {self.fivem_id}")
             
-        except discord.Forbidden:
-            await interaction.followup.send("❌ Não tenho permissão para excluir mensagens!", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Erro: {e}", ephemeral=True)
 
 class SetForm(ui.Modal, title="📝 Pedido de Set"):
-    """Modal para coletar dados do set com 3 campos"""
-    
     game_nick = ui.TextInput(
         label="1. Seu Nick no Jogo:",
         placeholder="Ex: João Silva",
@@ -231,7 +181,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
     )
     
     recrutador_id = ui.TextInput(
-        label="3. ID de quem te recrutou :",
+        label="3. ID de quem te recrutou:",
         placeholder="Ex: 9237 (ID do FiveM do recrutador)",
         style=discord.TextStyle.short,
         required=False,
@@ -242,27 +192,18 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            # Validar ID do FiveM (apenas números)
             if not self.fivem_id.value.isdigit():
-                error_msg = await interaction.followup.send(
-                    "❌ ID do FiveM deve conter apenas números!",
-                    ephemeral=True
-                )
+                error_msg = await interaction.followup.send("❌ ID do FiveM deve conter apenas números!", ephemeral=True)
                 await asyncio.sleep(5)
                 await error_msg.delete()
                 return
             
-            # Validar nick do jogo
             if not re.match(r'^[a-zA-Z0-9 _\-\.]+$', self.game_nick.value):
-                error_msg = await interaction.followup.send(
-                    "❌ Nick inválido! Use apenas letras, números, espaço, _, -, .",
-                    ephemeral=True
-                )
+                error_msg = await interaction.followup.send("❌ Nick inválido!", ephemeral=True)
                 await asyncio.sleep(5)
                 await error_msg.delete()
                 return
             
-            # Processar recrutador (se informado)
             recrutador_nome = None
             recrutador_member = None
             recrutador_fivem_id = None
@@ -270,40 +211,36 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             if self.recrutador_id.value and self.recrutador_id.value.strip():
                 recrutador_fivem_id = self.recrutador_id.value.strip()
                 
-                # Validar se é número
                 if not recrutador_fivem_id.isdigit():
-                    error_msg = await interaction.followup.send(
-                        "❌ ID do recrutador deve conter apenas números!",
-                        ephemeral=True
-                    )
+                    error_msg = await interaction.followup.send("❌ ID do recrutador deve conter apenas números!", ephemeral=True)
                     await asyncio.sleep(5)
                     await error_msg.delete()
                     return
                 
-                # Buscar recrutador pelo ID do FiveM
                 recrutador_member = buscar_usuario_por_id_fivem(interaction.guild, recrutador_fivem_id)
                 
                 if recrutador_member:
-                    # Extrair nome do nickname (formato M | nome | id)
                     if recrutador_member.nick:
                         nome_parts = recrutador_member.nick.split(' | ')
-                        if len(nome_parts) >= 2:
-                            recrutador_nome = nome_parts[1].strip()
-                        else:
-                            recrutador_nome = recrutador_member.nick
+                        recrutador_nome = nome_parts[1].strip() if len(nome_parts) >= 2 else recrutador_member.nick
                     else:
                         recrutador_nome = recrutador_member.name
-                    
-                    print(f"✅ Recrutador encontrado: {recrutador_nome} (ID Fivem: {recrutador_fivem_id})")
                 else:
-                    # Não encontrou, mas vamos permitir seguir com o ID informado
                     recrutador_nome = f"ID: {recrutador_fivem_id}"
-                    print(f"⚠️ Recrutador não encontrado, usando ID: {recrutador_fivem_id}")
             
-            # Encontrar canal de aprovação
-            canal_aprovamento = discord.utils.get(interaction.guild.text_channels, name="𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨")
+            # BUSCAR CANAL DE APROVAÇÃO DO DICIONÁRIO
+            canal_id = canais_aprovacao.get(interaction.guild.id)
+            if not canal_id:
+                await interaction.followup.send(
+                    "❌ Canal de aprovação não configurado!\n"
+                    "Um administrador precisa usar `!aprovamento #canal` primeiro.",
+                    ephemeral=True
+                )
+                return
+            
+            canal_aprovamento = interaction.guild.get_channel(canal_id)
             if not canal_aprovamento:
-                await interaction.followup.send("❌ Canal #𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨 não encontrado!", ephemeral=True)
+                await interaction.followup.send("❌ Canal de aprovação não encontrado!", ephemeral=True)
                 return
             
             # Verificar se ID já existe
@@ -312,7 +249,6 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                     await interaction.followup.send(f"❌ ID `{self.fivem_id.value}` já está em uso!", ephemeral=True)
                     return
             
-            # Criar embed com todas as informações
             descricao = (
                 f"**👤 Discord:** {interaction.user.mention}\n"
                 f"**🆔 Discord ID:** `{interaction.user.id}`\n"
@@ -321,7 +257,6 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 f"**📅 Data:** {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
             )
             
-            # Adicionar informação do recrutador se existir
             if recrutador_nome:
                 descricao += f"\n**🤝 Recrutado por:** {recrutador_nome}"
                 if recrutador_member:
@@ -330,29 +265,17 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             
             descricao += "\n\n**⏳ Status:** Aguardando aprovação"
             
-            embed = discord.Embed(
-                title="🎮 NOVO PEDIDO DE SET",
-                description=descricao,
-                color=discord.Color.purple()
-            )
+            embed = discord.Embed(title="🎮 NOVO PEDIDO DE SET", description=descricao, color=discord.Color.purple())
             
-            # Enviar para aprovação
             view = SetStaffView(
-                self.fivem_id.value, 
-                self.game_nick.value, 
-                interaction.user.id, 
-                interaction.user,
-                recrutador_fivem_id,
-                recrutador_nome
+                self.fivem_id.value, self.game_nick.value, interaction.user.id, interaction.user,
+                recrutador_fivem_id, recrutador_nome
             )
             
             await canal_aprovamento.send(embed=embed, view=view)
             
-            # Confirmação
             success_msg = await interaction.followup.send(
-                f"✅ **Pedido enviado!**\n"
-                f"• ID: `{self.fivem_id.value}`\n"
-                f"• Nick: `{self.game_nick.value}`\n"
+                f"✅ **Pedido enviado!**\n• ID: `{self.fivem_id.value}`\n• Nick: `{self.game_nick.value}`\n"
                 f"{f'• Recrutador: {recrutador_nome}' if recrutador_nome else ''}",
                 ephemeral=True
             )
@@ -363,7 +286,6 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             await interaction.followup.send(f"❌ Erro: {e}", ephemeral=True)
 
 class SetOpenView(ui.View):
-    """View inicial - botão para pedir set"""
     def __init__(self):
         super().__init__(timeout=None)
     
@@ -372,8 +294,6 @@ class SetOpenView(ui.View):
         modal = SetForm()
         await interaction.response.send_modal(modal)
 
-# ========== COG DO SISTEMA DE SET ==========
-
 class SetsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -381,28 +301,46 @@ class SetsCog(commands.Cog):
     
     @commands.Cog.listener()
     async def on_ready(self):
-        """Registra views persistentes"""
         self.bot.add_view(SetOpenView())
         print("✅ Views de Sets registradas!")
     
-    @commands.Cog.listener()
-    async def on_recrutamento_contabilizar(self, dados):
-        """🔗 PONTE PARA MÓDULO DE RECRUTAMENTOS
-        Este evento é disparado quando um set é aprovado com recrutador
-        """
-        print(f"📊 Evento de recrutamento recebido: {dados}")
-        print(f"✅ Recrutamento contabilizado: {dados['recrutador_nome']} recrutou {dados['recrutado_nome']}")
+    @commands.command(name="aprovamento", aliases=["aprov"])
+    @commands.has_permissions(administrator=True)
+    async def set_aprovamento(self, ctx, canal: discord.TextChannel = None):
+        """Define o canal de aprovação de sets"""
+        if not canal:
+            canal = ctx.channel
+        
+        canais_aprovacao[ctx.guild.id] = canal.id
+        
+        embed = discord.Embed(
+            title="✅ Canal de Aprovação Definido",
+            description=f"Os pedidos de set agora serão enviados para: {canal.mention}",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+        print(f"✅ Canal de aprovação definido: #{canal.name} em {ctx.guild.name}")
     
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def setup_set(self, ctx):
         """Configura o painel de pedido de set"""
         
-        # Verificar se o cargo base existe
-        cargo_base = ctx.guild.get_role(CARGO_BASE_APROVACAO_ID)
-        if not cargo_base:
-            await ctx.send(f"⚠️ **Cargo base não encontrado!**\nID: `{CARGO_BASE_APROVACAO_ID}`\nVerifique se o ID está correto.")
+        # Verificar se já tem canal de aprovação
+        if ctx.guild.id not in canais_aprovacao:
+            embed_aviso = discord.Embed(
+                title="⚠️ Configure o Canal de Aprovação Primeiro!",
+                description=(
+                    "Use o comando `!aprovamento #canal` para definir onde os pedidos serão enviados.\n\n"
+                    "**Exemplo:**\n"
+                    "`!aprovamento #𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨`"
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed_aviso)
             return
+        
+        canal = ctx.guild.get_channel(canais_aprovacao[ctx.guild.id])
         
         embed = discord.Embed(
             title="🎮 **PEÇA SEU SET AQUI!**",
@@ -415,8 +353,7 @@ class SetsCog(commands.Cog):
                 "**📌 Após aprovação:**\n"
                 "• **Nickname:** `M | Nome | ID`\n"
                 "• **Cargo:** 🙅‍♂️ | Membro\n\n"
-                "**🎯 Como encontrar seu ID do FiveM?**\n"
-                "FiveM → Configurações → Perfil → Copiar Identificador"
+                f"**📋 Pedidos serão enviados para:** {canal.mention}"
             ),
             color=discord.Color.purple()
         )
@@ -427,7 +364,7 @@ class SetsCog(commands.Cog):
             inline=False
         )
         
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1473746931003035801/1474722296920015000/image.png?ex=699ae1aa&is=6999902a&hm=6a50a9de87ee7ea931de03354f3c6bb32c3c214b4c19bbd323e43d8b72ed38ef")
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1473746931003035801/1474722296920015000/image.png")
         embed.set_footer(text="Sistema automático • WaveX")
         
         view = SetOpenView()
@@ -437,9 +374,14 @@ class SetsCog(commands.Cog):
     @commands.command()
     async def check_id(self, ctx, *, fivem_id: str):
         """Verifica se um ID Fivem já está em uso"""
-        canal = discord.utils.get(ctx.guild.text_channels, name="𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨")
+        canal_id = canais_aprovacao.get(ctx.guild.id)
+        if not canal_id:
+            await ctx.send("❌ Canal de aprovação não configurado! Use `!aprovamento #canal` primeiro.")
+            return
+        
+        canal = ctx.guild.get_channel(canal_id)
         if not canal:
-            await ctx.send("❌ Canal #𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨 não encontrado!")
+            await ctx.send("❌ Canal de aprovação não encontrado!")
             return
         
         if not fivem_id.isdigit():
@@ -460,9 +402,14 @@ class SetsCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def sets_pendentes(self, ctx):
         """Mostra pedidos pendentes"""
-        canal = discord.utils.get(ctx.guild.text_channels, name="𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨")
+        canal_id = canais_aprovacao.get(ctx.guild.id)
+        if not canal_id:
+            await ctx.send("❌ Canal de aprovação não configurado! Use `!aprovamento #canal` primeiro.")
+            return
+        
+        canal = ctx.guild.get_channel(canal_id)
         if not canal:
-            await ctx.send("❌ Canal #𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨 não encontrado!")
+            await ctx.send("❌ Canal de aprovação não encontrado!")
             return
         
         pedidos = []
@@ -500,6 +447,5 @@ class SetsCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(SetsCog(bot))
-    # Registrar view persistente
     bot.add_view(SetOpenView())
     print("✅ Sistema de Sets configurado com views persistentes!")
