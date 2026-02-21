@@ -278,11 +278,17 @@ class SetsCog(commands.Cog, name="Sets"):
         embed = discord.Embed(
             title="🎮 PEÇA SEU SET AQUI!",
             description=(
-                "Clique no botão abaixo e preencha:\n\n"
+               "Clique no botão abaixo e peça seu\n"
+                "aprovamento para receber seu set\n"
+                "personalizado no servidor.\n\n"
+                "**📌 Instruções:**\n"
+                "1. Clique em **'Peça seu Set!'**\n"
+                "2. Digite seu **ID do Fivem**\n"
+                "3. Digite seu **Nick do Jogo**\n"
+                "4. Aguarde aprovação da equipe\n\n"
                 "1️⃣ **Nick do Jogo**\n"
                 "2️⃣ **ID do FiveM**\n"
                 "3️⃣ **ID do Recrutador** (opcional)\n\n"
-                f"📌 **Pedidos vão para:** {canal.mention}"
             ),
             color=discord.Color.purple()
         )
