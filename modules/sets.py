@@ -287,11 +287,6 @@ class SetsCog(commands.Cog, name="Sets"):
         self.bot = bot
         print("✅ Módulo Sets carregado!")
     
-    async def cog_load(self):
-        """Registra a view UMA ÚNICA VEZ quando o cog carrega"""
-        self.bot.add_view(SetOpenView())
-        print("✅ View do Sets registrada!")
-    
     @commands.Cog.listener()
     async def on_ready(self):
         """Apenas log quando o bot estiver pronto"""
@@ -451,4 +446,6 @@ class SetsCog(commands.Cog, name="Sets"):
 # ========== SETUP ==========
 async def setup(bot):
     await bot.add_cog(SetsCog(bot))
-    print("✅ Sistema de Sets configurado!")
+    # ✅ REGISTRA A VIEW AQUI - UMA ÚNICA VEZ (igual ao base que funciona)
+    bot.add_view(SetOpenView())
+    print("✅ Sistema de Sets configurado com views persistentes!")
