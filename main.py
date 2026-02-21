@@ -74,7 +74,7 @@ async def load_cogs():
     cogs = [
         'config_cargos.py',
         'modules.tickets',
-        'modules.sets',
+        'modules.sets.py',
         'modules.cargos',
     ]
     
