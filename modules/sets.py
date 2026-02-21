@@ -7,6 +7,9 @@ import re
 
 # ========== CONFIGURAÇÃO ==========
 CARGO_BASE_APROVACAO_ID = 1421254143103996045
+
+# IMPORTANTE: Usar o dicionário global do main.py
+# Isso será injetado pelo bot
 canais_aprovacao = {}
 
 def usuario_pode_aprovar(member: discord.Member) -> bool:
@@ -28,18 +31,18 @@ def buscar_usuario_por_id_fivem(guild: discord.Guild, fivem_id: str) -> discord.
             return member
     return None
 
-# ========== VIEW DO STAFF ==========
+# ========== VIEWS COM CUSTOM_IDS FIXOS ==========
 class SetStaffView(ui.View):
     def __init__(self, fivem_id, game_nick, user_id, discord_user, recrutador_id=None, recrutador_nome=None):
-        super().__init__(timeout=None)
-        self.fivem_id_value = fivem_id  # ← MUDADO PARA self.fivem_id_value
+        super().__init__(timeout=None)  # timeout=None é ESSENCIAL para persistência
+        self.fivem_id = fivem_id
         self.game_nick = game_nick
         self.user_id = user_id
         self.discord_user = discord_user
         self.recrutador_id = recrutador_id
         self.recrutador_nome = recrutador_nome
     
-    @ui.button(label="✅ Aprovar Set", style=ButtonStyle.green, custom_id="aprovar_set_btn", row=0)
+    @ui.button(label="✅ Aprovar Set", style=ButtonStyle.green, custom_id="persist_aprovar_set", row=0)
     async def aprovar_set(self, interaction: discord.Interaction, button: ui.Button):
         if not usuario_pode_aprovar(interaction.user):
             await interaction.response.send_message("❌ Sem permissão!", ephemeral=True)
@@ -53,24 +56,21 @@ class SetStaffView(ui.View):
                 await interaction.followup.send("❌ Usuário não encontrado!", ephemeral=True)
                 return
             
-            # Mudar nickname
-            novo_nick = f"M | {self.game_nick} | {self.fivem_id_value}"
+            novo_nick = f"M | {self.game_nick} | {self.fivem_id}"
             if len(novo_nick) > 32:
-                novo_nick = f"M | {self.game_nick[:15]} | {self.fivem_id_value}"
+                novo_nick = f"M | {self.game_nick[:15]} | {self.fivem_id}"
             
             await member.edit(nick=novo_nick)
             
-            # Dar cargo
             cargo = discord.utils.get(interaction.guild.roles, name="🙅‍♂️ | Membro") or discord.utils.get(interaction.guild.roles, name="Membro")
             if cargo:
                 await member.add_roles(cargo)
             
-            # Embed de aprovação
             embed = discord.Embed(
                 title="✅ SET APROVADO!",
                 description=(
                     f"**👤 Discord:** {member.mention}\n"
-                    f"**🎮 ID Fivem:** `{self.fivem_id_value}`\n"
+                    f"**🎮 ID Fivem:** `{self.fivem_id}`\n"
                     f"**👤 Nick:** `{self.game_nick}`\n"
                     f"**👑 Aprovado por:** {interaction.user.mention}\n"
                     f"**📅 Data:** {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
@@ -83,13 +83,10 @@ class SetStaffView(ui.View):
             if self.recrutador_nome:
                 embed.description += f"\n✅ **Recrutador:** {self.recrutador_nome}"
             
-            # Remover botões
             self.clear_items()
             await interaction.message.edit(embed=embed, view=self)
-            
             await interaction.followup.send(f"✅ Set de {member.mention} aprovado!", ephemeral=True)
             
-            # DM
             try:
                 await member.send(f"✅ Seu set foi aprovado! Agora você é **{novo_nick}**")
             except:
@@ -98,7 +95,7 @@ class SetStaffView(ui.View):
         except Exception as e:
             await interaction.followup.send(f"❌ Erro: {e}", ephemeral=True)
     
-    @ui.button(label="❌ Recusar Set", style=ButtonStyle.red, custom_id="recusar_set_btn", row=0)
+    @ui.button(label="❌ Recusar Set", style=ButtonStyle.red, custom_id="persist_recusar_set", row=0)
     async def recusar_set(self, interaction: discord.Interaction, button: ui.Button):
         if not usuario_pode_aprovar(interaction.user):
             await interaction.response.send_message("❌ Sem permissão!", ephemeral=True)
@@ -111,7 +108,7 @@ class SetStaffView(ui.View):
                 title="❌ SET RECUSADO",
                 description=(
                     f"**👤 Discord:** {self.discord_user.mention}\n"
-                    f"**🎮 ID Fivem:** `{self.fivem_id_value}`\n"
+                    f"**🎮 ID Fivem:** `{self.fivem_id}`\n"
                     f"**👤 Nick:** `{self.game_nick}`\n"
                     f"**👑 Recusado por:** {interaction.user.mention}"
                 ),
@@ -125,7 +122,6 @@ class SetStaffView(ui.View):
         except Exception as e:
             await interaction.followup.send(f"❌ Erro: {e}", ephemeral=True)
 
-# ========== MODAL DO FORMULÁRIO ==========
 class SetForm(ui.Modal, title="📝 Pedido de Set"):
     nick = ui.TextInput(
         label="1. Seu Nick no Jogo:",
@@ -152,26 +148,25 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            # Validar ID do FiveM
             if not self.id_fivem.value.isdigit():
                 await interaction.followup.send("❌ ID do FiveM deve conter apenas números!", ephemeral=True)
                 return
             
-            # Verificar canal de aprovação
+            # Usar o dicionário global
             canal_id = canais_aprovacao.get(interaction.guild.id)
             if not canal_id:
-                await interaction.followup.send("❌ Canal de aprovação não configurado! Use `!aprovamento #canal`", ephemeral=True)
+                await interaction.followup.send("❌ Use `!aprovamento #canal` primeiro!", ephemeral=True)
                 return
             
             canal = interaction.guild.get_channel(canal_id)
             if not canal:
-                await interaction.followup.send("❌ Canal de aprovação não encontrado!", ephemeral=True)
+                await interaction.followup.send("❌ Canal não encontrado!", ephemeral=True)
                 return
             
-            # Verificar se ID já existe
+            # Verificar ID duplicado
             async for msg in canal.history(limit=200):
                 if msg.embeds and f"**🎮 ID Fivem:** `{self.id_fivem.value}`" in (msg.embeds[0].description or ""):
-                    await interaction.followup.send(f"❌ ID `{self.id_fivem.value}` já em uso!", ephemeral=True)
+                    await interaction.followup.send(f"❌ ID `{self.id_fivem.value}` já existe!", ephemeral=True)
                     return
             
             # Processar recrutador
@@ -205,13 +200,9 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             
             desc += "\n\n**⏳ Status:** Aguardando aprovação"
             
-            embed = discord.Embed(
-                title="🎮 NOVO PEDIDO DE SET",
-                description=desc,
-                color=discord.Color.purple()
-            )
+            embed = discord.Embed(title="🎮 NOVO PEDIDO DE SET", description=desc, color=discord.Color.purple())
             
-            # Enviar para aprovação
+            # Criar view com os dados
             view = SetStaffView(
                 self.id_fivem.value,
                 self.nick.value,
@@ -222,34 +213,32 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             )
             
             await canal.send(embed=embed, view=view)
-            
-            await interaction.followup.send(
-                f"✅ **Pedido enviado!**\n• ID: `{self.id_fivem.value}`\n• Nick: `{self.nick.value}`",
-                ephemeral=True
-            )
+            await interaction.followup.send(f"✅ Pedido enviado! ID: `{self.id_fivem.value}`", ephemeral=True)
             
         except Exception as e:
             await interaction.followup.send(f"❌ Erro: {e}", ephemeral=True)
 
-# ========== VIEW PRINCIPAL ==========
 class SetOpenView(ui.View):
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__(timeout=None)  # timeout=None é ESSENCIAL
     
-    @ui.button(label="Peça seu Set!", style=ButtonStyle.primary, custom_id="pedir_set_btn")
+    @ui.button(label="Peça seu Set!", style=ButtonStyle.primary, custom_id="persist_pedir_set")
     async def pedir_set(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(SetForm())
 
-# ========== COG PRINCIPAL ==========
 class SetsCog(commands.Cog, name="Sets"):
     def __init__(self, bot):
         self.bot = bot
+        # Compartilhar o dicionário global
+        global canais_aprovacao
+        canais_aprovacao = bot.canais_aprovacao if hasattr(bot, 'canais_aprovacao') else {}
         print("✅ Sets carregado!")
     
     @commands.Cog.listener()
     async def on_ready(self):
+        # Registrar a view UMA ÚNICA VEZ
         self.bot.add_view(SetOpenView())
-        print("✅ Views do Sets registradas!")
+        print("✅ View do Sets registrada para persistência!")
     
     @commands.command(name="aprovamento", aliases=["aprov", "setcanal"])
     @commands.has_permissions(administrator=True)
@@ -278,23 +267,18 @@ class SetsCog(commands.Cog, name="Sets"):
         embed = discord.Embed(
             title="🎮 PEÇA SEU SET AQUI!",
             description=(
-               "Clique no botão abaixo e peça seu\n"
-                "aprovamento para receber seu set\n"
-                "personalizado no servidor.\n\n"
-                "**📌 Instruções:**\n"
-                "1. Clique em **'Peça seu Set!'**\n"
-                "2. Digite seu **ID do Fivem**\n"
-                "3. Digite seu **Nick do Jogo**\n"
-                "4. Aguarde aprovação da equipe\n\n"
+                "Clique no botão abaixo e preencha:\n\n"
                 "1️⃣ **Nick do Jogo**\n"
                 "2️⃣ **ID do FiveM**\n"
                 "3️⃣ **ID do Recrutador** (opcional)\n\n"
+                f"📌 **Pedidos vão para:** {canal.mention}"
             ),
             color=discord.Color.purple()
         )
         
         embed.set_image(url="https://cdn.discordapp.com/attachments/1473746931003035801/1474722296920015000/image.png")
         
+        # Usar a mesma view registrada
         await ctx.send(embed=embed, view=SetOpenView())
         await ctx.message.delete()
     
@@ -324,8 +308,7 @@ class SetsCog(commands.Cog, name="Sets"):
         if not encontrado:
             await ctx.send(f"✅ ID `{id_fivem}` disponível!")
 
-# ========== SETUP ==========
 async def setup(bot):
     await bot.add_cog(SetsCog(bot))
-    bot.add_view(SetOpenView())
-    print("✅ Sets configurado com views persistentes!")
+    # NÃO adicione view aqui - já foi adicionada no on_ready
+    print("✅ Sets configurado!")
