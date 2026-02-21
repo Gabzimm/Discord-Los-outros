@@ -7,20 +7,20 @@ import re
 
 # ========== CONFIGURAÇÃO DE CARGOS (NOMES REAIS) ==========
 CARGOS_CONFIG = {
-    "👑|Lider|00": 1474880677827579935,
-    "💎|Lider|01": 1474880748803723294,
-    "👮|Lider|02": 1474880750909128874,
-    "🎖️|Lider|03": 1474880752566014156,
-    "🎖️| Gerente Geral": 1474880754214371539,
-    "🎖️| Gerente De Farm": 1474880755078533241,
-    "🎖️| Gerente De Pista": 1474880756026179825,
-    "🎖️| Gerente de Recrutamento": 1474880756433162353,
-    "🎖️| Supervisor": 1474880757385134130,
-    "🎖️| Recrutador": 1474880757984923708,
-    "🎖️| Ceo Elite": 1474881051569688656,
-    "🎖️| Sub Elite": 1474881053108731945,
-    "🎖️| Elite": 1474881054300180631,
-    "🙅‍♂️| Membro": 1474669904547549265,
+    "👑 | Lider | 00": 1474880677827579935,
+    "💎 | Lider | 01": 1474880748803723294,
+    "👮 | Lider | 02": 1474880750909128874,
+    "🎖️ | Lider | 03": 1474880752566014156,
+    "🎖️ | Gerente Geral": 1474880754214371539,
+    "🎖️ | Gerente De Farm": 1474880755078533241,
+    "🎖️ | Gerente De Pista": 1474880756026179825,
+    "🎖️ | Gerente de Recrutamento": 1474880756433162353,
+    "🎖️ | Supervisor": 1474880757385134130,
+    "🎖️ | Recrutador": 1474880757984923708,
+    "🎖️ | Ceo Elite": 1474881051569688656,
+    "🎖️ | Sub Elite": 1474881053108731945,
+    "🎖️ | Elite": 1474881054300180631,
+    "🙅‍♂️ | Membro": 1474669904547549265,
 }
 
 # Mapeamento de prefixos visuais para os cargos
@@ -72,6 +72,61 @@ NICKNAME_CONFIG = {
 }
 
 # ========== FUNÇÕES AUXILIARES ==========
+def extrair_parte_nickname(nickname: str):
+    """Extrai a parte do nome do usuário (remove clan tags, números extras, etc)"""
+    if not nickname:
+        return "User"
+    
+    # Dividir por ' | ' primeiro
+    partes = nickname.split(' | ')
+    
+    # Se tiver 3 partes: "PREFIXO | NOME | ID"
+    if len(partes) >= 3:
+        nome = partes[1].strip()
+    # Se tiver 2 partes: "NOME | ID"
+    elif len(partes) == 2:
+        nome = partes[0].strip()
+    else:
+        nome = nickname.strip()
+    
+    # Remover qualquer coisa entre parênteses (ex: (10000))
+    nome = re.sub(r'\s*\([^)]*\)', '', nome)
+    
+    # Remover números soltos no meio do nome
+    nome = re.sub(r'\s+\d+\s*$', '', nome)  # Remove números no final
+    nome = re.sub(r'\s+\d+\s+', ' ', nome)  # Remove números no meio
+    
+    return nome.strip() or "User"
+
+def extrair_id_fivem(nickname: str):
+    """Extrai ID do FiveM do nickname (sempre o ÚLTIMO número)"""
+    if not nickname:
+        return None
+    
+    # Encontrar TODOS os números no nickname
+    numeros = re.findall(r'\b(\d+)\b', nickname)
+    
+    if numeros:
+        # Retornar o ÚLTIMO número (assumindo que é o ID do FiveM)
+        return numeros[-1]
+    
+    return None
+
+def extrair_prefixo_visual(nickname: str):
+    """Extrai o prefixo visual do nickname"""
+    if not nickname:
+        return None
+    
+    # Tentar pegar a primeira parte antes do primeiro |
+    partes = nickname.split(' | ')
+    if partes:
+        prefixo = partes[0].strip()
+        # Verificar se o prefixo está na lista de prefixos visuais
+        if prefixo in PREFIXOS_VISUAIS:
+            return prefixo
+    
+    return None
+
 def get_cargo_por_prefixo(guild: discord.Guild, prefixo: str):
     """Retorna o objeto cargo baseado no prefixo"""
     if prefixo not in PREFIXO_PARA_CARGO:
@@ -89,43 +144,6 @@ def get_prefixo_por_cargo(role: discord.Role) -> str:
     for prefixo, nome_cargo in PREFIXO_PARA_CARGO.items():
         if role.name == nome_cargo or role.id == CARGOS_CONFIG.get(nome_cargo):
             return prefixo
-    return None
-
-def extrair_parte_nickname(nickname: str):
-    """Extrai a parte do nome do usuário"""
-    if not nickname:
-        return "User"
-    
-    partes = nickname.split(' | ')
-    if len(partes) >= 2:
-        return partes[1].strip()
-    
-    return nickname.strip()
-
-def extrair_id_fivem(nickname: str):
-    """Extrai ID do FiveM do nickname"""
-    if not nickname:
-        return None
-    
-    partes = nickname.split(' | ')
-    if len(partes) >= 3:
-        ultima_parte = partes[-1].strip()
-        if ultima_parte.isdigit():
-            return ultima_parte
-    
-    return None
-
-def extrair_prefixo_visual(nickname: str):
-    """Extrai o prefixo visual do nickname"""
-    if not nickname:
-        return None
-    
-    partes = nickname.split(' | ')
-    if partes:
-        prefixo = partes[0].strip()
-        if prefixo in PREFIXOS_VISUAIS:
-            return prefixo
-    
     return None
 
 def usuario_pode_usar_painel(member: discord.Member) -> bool:
@@ -161,6 +179,14 @@ async def atualizar_nickname(member: discord.Member):
         if not id_fivem:
             id_fivem = "000000"
         
+        # Se o nome estiver vazio, usar o nome do usuário
+        if not parte_nome or parte_nome == "User":
+            parte_nome = member.name.split('#')[0]
+        
+        # Limpar o nome: remover caracteres especiais e espaços extras
+        parte_nome = re.sub(r'[^\w\s]', '', parte_nome)
+        parte_nome = ' '.join(parte_nome.split())
+        
         # Determinar o prefixo visual baseado nos cargos do membro
         prefixo_visual = "M"  # Padrão
         
@@ -171,13 +197,20 @@ async def atualizar_nickname(member: discord.Member):
                 prefixo_visual = prefixo
                 break
         
-        # Gerar novo nickname
+        # Gerar novo nickname no formato "PREFIXO | NOME | ID"
         template = NICKNAME_CONFIG.get(prefixo_visual, NICKNAME_CONFIG["M"])
         novo_nick = template.format(name=parte_nome, id=id_fivem)
         
         # Limitar a 32 caracteres
         if len(novo_nick) > 32:
-            novo_nick = novo_nick[:32]
+            # Encurtar o nome
+            nome_curto = parte_nome[:15]
+            novo_nick = template.format(name=nome_curto, id=id_fivem)
+            
+            if len(novo_nick) > 32:
+                # Último caso: remover espaços
+                novo_nick = novo_nick.replace(' ', '')
+                novo_nick = novo_nick[:32]
         
         # Aplicar se for diferente
         if member.nick != novo_nick:
