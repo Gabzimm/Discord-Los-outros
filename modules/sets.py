@@ -169,7 +169,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
     
     recrutador = ui.TextInput(
         label="3. ID de quem te recrutou:",
-        placeholder="Ex: 9237 (opcional)",
+        placeholder="Ex: 9237",
         required=True,
         max_length=20
     )
@@ -184,6 +184,15 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             
             if not re.match(r'^[a-zA-Z0-9\s]+$', self.nick.value):
                 await interaction.followup.send("❌ Nick inválido! Use apenas letras e números.", ephemeral=True)
+                return
+            
+            # Validar ID do recrutador (agora obrigatório)
+            if not self.recrutador.value or not self.recrutador.value.strip():
+                await interaction.followup.send("❌ ID do recrutador é obrigatório!", ephemeral=True)
+                return
+            
+            if not self.recrutador.value.isdigit():
+                await interaction.followup.send("❌ ID do recrutador deve conter apenas números!", ephemeral=True)
                 return
             
             canal_id = canais_aprovacao.get(interaction.guild.id)
@@ -207,23 +216,19 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                             await interaction.followup.send(f"❌ ID `{self.id_fivem.value}` já está em uso!", ephemeral=True)
                             return
             
+            # Processar recrutador (agora sempre preenchido)
             recrutador_nome = None
             recrutador_member = None
             
-            if self.recrutador.value and self.recrutador.value.strip():
-                if not self.recrutador.value.isdigit():
-                    await interaction.followup.send("❌ ID do recrutador deve conter apenas números!", ephemeral=True)
-                    return
-                
-                recrutador_member = buscar_usuario_por_id_fivem(interaction.guild, self.recrutador.value)
-                if recrutador_member:
-                    if recrutador_member.nick:
-                        partes = recrutador_member.nick.split(' | ')
-                        recrutador_nome = partes[1] if len(partes) >= 2 else recrutador_member.nick
-                    else:
-                        recrutador_nome = recrutador_member.name
+            recrutador_member = buscar_usuario_por_id_fivem(interaction.guild, self.recrutador.value)
+            if recrutador_member:
+                if recrutador_member.nick:
+                    partes = recrutador_member.nick.split(' | ')
+                    recrutador_nome = partes[1] if len(partes) >= 2 else recrutador_member.nick
                 else:
-                    recrutador_nome = f"ID: {self.recrutador.value}"
+                    recrutador_nome = recrutador_member.name
+            else:
+                recrutador_nome = f"ID: {self.recrutador.value}"
             
             descricao = (
                 f"**👤 Discord:** {interaction.user.mention}\n"
@@ -233,10 +238,9 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 f"**📅 Data:** {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
             )
             
-            if recrutador_nome:
-                descricao += f"\n**🤝 Recrutado por:** {recrutador_nome}"
-                if recrutador_member:
-                    descricao += f" ({recrutador_member.mention})"
+            descricao += f"\n**🤝 Recrutado por:** {recrutador_nome}"
+            if recrutador_member:
+                descricao += f" ({recrutador_member.mention})"
             
             descricao += "\n\n**⏳ Status:** Aguardando aprovação"
             
@@ -251,7 +255,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 self.nick.value,
                 interaction.user.id,
                 interaction.user,
-                self.recrutador.value if self.recrutador.value else None,
+                self.recrutador.value,
                 recrutador_nome
             )
             
@@ -261,7 +265,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 f"✅ **Pedido enviado!**\n"
                 f"• ID: `{self.id_fivem.value}`\n"
                 f"• Nick: `{self.nick.value}`\n"
-                f"{f'• Recrutador: {recrutador_nome}' if recrutador_nome else ''}",
+                f"• Recrutador: {recrutador_nome}",
                 ephemeral=True
             )
             
@@ -314,6 +318,7 @@ class SetsCog(commands.Cog, name="Sets"):
     async def setup_set(self, ctx):
         """🎮 Configura o painel de pedido de set"""
         
+        # VERIFICAR SE CANAL ESTÁ CONFIGURADO
         if ctx.guild.id not in canais_aprovacao:
             embed_aviso = discord.Embed(
                 title="⚠️ Configure o Canal de Aprovação Primeiro!",
@@ -324,27 +329,43 @@ class SetsCog(commands.Cog, name="Sets"):
                 ),
                 color=discord.Color.orange()
             )
-            await ctx.send(embed=embed_aviso)
+            
+            # Enviar mensagem de aviso
+            msg_aviso = await ctx.send(embed=embed_aviso)
+            
+            # Apagar o comando do usuário e a mensagem de aviso após 3 segundos
+            await asyncio.sleep(3)
+            
+            try:
+                await ctx.message.delete()  # Apaga o comando !setup_set
+                await msg_aviso.delete()     # Apaga a mensagem de aviso
+            except:
+                pass  # Se não conseguir apagar, ignora
+            
             return
         
+        # SE CANAL ESTÁ CONFIGURADO, CONTINUA NORMALMENTE
         canal = ctx.guild.get_channel(canais_aprovacao[ctx.guild.id])
         
         embed = discord.Embed(
             title="🎮 **PEÇA SEU SET AQUI!**",
             description=(
                 "Clique no botão abaixo e preencha os dados:\n\n"
-                "**📝 Formulário:**\n"
-                "1️⃣ **Nick do Jogo** - Seu nome no FiveM\n"
-                "2️⃣ **ID do FiveM** - Seu identificador único\n"
-                "3️⃣ **ID do Recrutador** - Quem te trouxe ao servidor (opcional)\n\n"
-                f"**📋 Pedidos serão enviados para:** {canal.mention}"
+                "aprovamento para receber seu set\n"
+                "personalizado no servidor.\n\n"
+                "**📌 Instruções:**\n"
+                "1. Clique em **'Peça seu Set!'**\n"
+                "2. Digite seu **ID do Fivem**\n"
+                "3. Digite seu **Nick do Jogo**\n"
+                "4. Digite o **ID do Recrutador**\n"
+                "5. Aguarde aprovação da equipe\n\n"
             ),
             color=discord.Color.purple()
         )
         
         embed.add_field(
             name="🤝 Como encontrar ID do Recrutador?",
-            value="Procure no nickname da pessoa: `M | Nome | 123456`\nO número após o último '|' é o ID do FiveM",
+            value="Procure no nickname da pessoa: `Rec | Nome | 9237`\nO número após o último '|' é o ID do FiveM",
             inline=False
         )
         
@@ -353,7 +374,12 @@ class SetsCog(commands.Cog, name="Sets"):
         
         view = SetOpenView()
         await ctx.send(embed=embed, view=view)
-        await ctx.message.delete()
+        
+        # Apagar o comando do usuário
+        try:
+            await ctx.message.delete()
+        except:
+            pass
     
     @commands.command(name="check_id", aliases=["checkid"])
     async def check_id(self, ctx, id_fivem: str):
@@ -446,6 +472,5 @@ class SetsCog(commands.Cog, name="Sets"):
 # ========== SETUP ==========
 async def setup(bot):
     await bot.add_cog(SetsCog(bot))
-    # ✅ REGISTRA A VIEW AQUI - UMA ÚNICA VEZ (igual ao base que funciona)
     bot.add_view(SetOpenView())
     print("✅ Sistema de Sets configurado com views persistentes!")
