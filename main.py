@@ -149,7 +149,7 @@ async def custom_help(ctx, *, comando: str = None):
     #comandos de Premiacao
      embed.add_field(
         name="🏆 **PRÊMIOS**",
-        value=( "`!premio @user [rec/farm/pista]` `!premio @user` `!premios`",
+        value="`!premio @user [rec/farm/pista]` `!premio @user` `!premios`",
         inline=False
          
     )
