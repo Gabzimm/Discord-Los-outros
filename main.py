@@ -7,7 +7,7 @@ import asyncio
 import aiohttp
 from aiohttp import web
 
-# ==================== KEEP-ALIVE SIMPLES (PORTA ALTERADA) ====================
+# ==================== KEEP-ALIVE ====================
 class KeepAliveServer:
     def __init__(self):
         self.app = None
@@ -15,18 +15,15 @@ class KeepAliveServer:
         self.site = None
     
     async def start_simple(self):
-        """Inicia um servidor web simples na porta 8080"""
         try:
             self.app = web.Application()
             
             async def handle(request):
-                return web.Response(text="🤖 Bot Discord Online - Sistema de Cargos e Sets")
+                return web.Response(text="🤖 Bot Discord Online")
             
             async def handle_health(request):
                 return web.json_response({
                     "status": "online",
-                    "bot_name": str(bot.user) if bot.user else "Conectando...",
-                    "servers": len(bot.guilds) if bot.is_ready() else 0,
                     "timestamp": datetime.now().isoformat()
                 })
             
@@ -35,21 +32,15 @@ class KeepAliveServer:
             
             self.runner = web.AppRunner(self.app)
             await self.runner.setup()
-            
-            # Usar porta 8080 (mais comum para UptimeRobot)
             self.site = web.TCPSite(self.runner, '0.0.0.0', 8080)
             await self.site.start()
             
             print(f"🌐 Keep-alive iniciado na porta 8080")
-            print(f"📊 Health check: http://0.0.0.0:8080/health")
-            print(f"✅ Use esta URL no UptimeRobot: https://{os.getenv('RENDER_EXTERNAL_HOSTNAME', 'seu-bot.onrender.com')}/health")
             
         except Exception as e:
-            print(f"⚠️ Não foi possível iniciar keep-alive: {e}")
-            print("⚠️ Bot continuará sem servidor web...")
+            print(f"⚠️ Erro no keep-alive: {e}")
     
     async def stop(self):
-        """Para o servidor web"""
         if self.site:
             await self.site.stop()
         if self.runner:
@@ -64,16 +55,21 @@ intents.guilds = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 keep_alive = KeepAliveServer()
 
+# ==================== DICIONÁRIO GLOBAL DE CANAIS ====================
+# Isso será compartilhado entre todos os módulos
+canais_aprovacao = {}  # {guild_id: channel_id}
+
 # ==================== CARREGAR MÓDULOS ====================
 async def load_cogs():
-    """Carrega módulos adicionais"""
     print("=" * 50)
     print("🔄 CARREGANDO MÓDULOS...")
     
+    # Lista de módulos para carregar
     cogs = [
+        'config_cargos.py',
         'modules.tickets',
         'modules.sets',
-        'modules.cargos',
+        'modules.cargos',  
     ]
     
     carregados = 0
@@ -83,24 +79,12 @@ async def load_cogs():
             await bot.load_extension(cog)
             print(f"✅ '{cog}' carregado!")
             carregados += 1
-        except ModuleNotFoundError as e:
-            print(f"❌ ModuleNotFoundError: {e}")
-            print(f"   → O arquivo {cog}.py não foi encontrado na pasta modules/")
-        except ImportError as e:
-            print(f"❌ ImportError: {e}")
-            print(f"   → Erro ao importar {cog}")
-        except commands.ExtensionNotFound as e:
-            print(f"❌ ExtensionNotFound: {e}")
-            print(f"   → Extensão {cog} não encontrada")
-        except commands.ExtensionFailed as e:
-            print(f"❌ ExtensionFailed: {e}")
-            print(f"   → {e.original}")  # Mostra o erro original
         except Exception as e:
-            print(f"❌ Erro inesperado: {type(e).__name__}: {e}")
+            print(f"❌ Erro: {type(e).__name__}: {e}")
     
     print(f"\n📊 {carregados}/{len(cogs)} módulos carregados")
     print("=" * 50)
-    return carregados > 0
+
 # ==================== EVENTOS ====================
 @bot.event
 async def on_ready():
@@ -108,7 +92,6 @@ async def on_ready():
     print(f'🆔 ID: {bot.user.id}')
     print(f'📡 Ping: {round(bot.latency * 1000)}ms')
     print(f'🏠 Servidores: {len(bot.guilds)}')
-    print(f'🌐 Keep-alive ativo na porta 8080')
     print('🚀 Bot pronto!')
     
     await bot.change_presence(
@@ -118,66 +101,68 @@ async def on_ready():
         )
     )
     
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ {len(synced)} comandos slash sincronizados")
-    except:
-        print("⚠️ Sem comandos slash para sincronizar")
-    
-    print("✅ Sistema de persistência de views ativo!")
+    # NÃO registre views aqui! Cada cog registra as suas próprias
+    print("✅ Sistema de persistência ativo!")
 
 # ==================== COMANDOS ====================
 @bot.command()
 async def ping(ctx):
-    """Mostra latência do bot"""
     latency = round(bot.latency * 1000)
-    embed = discord.Embed(
-        title="🏓 Pong!",
-        description=f"Latência: **{latency}ms**",
-        color=discord.Color.green()
-    )
-    await ctx.send(embed=embed)
+    await ctx.send(f"🏓 Pong! Latência: **{latency}ms**")
 
 @bot.command()
 async def status(ctx):
-    """Mostra status do bot"""
-    embed = discord.Embed(
-        title="🤖 Status do Bot",
-        color=discord.Color.green()
-    )
-    
+    embed = discord.Embed(title="🤖 Status do Bot", color=discord.Color.green())
     embed.add_field(name="🏷️ Nome", value=bot.user.name, inline=True)
-    embed.add_field(name="🆔 ID", value=bot.user.id, inline=True)
     embed.add_field(name="📡 Ping", value=f"{round(bot.latency * 1000)}ms", inline=True)
     embed.add_field(name="🏠 Servidores", value=len(bot.guilds), inline=True)
     
-    total_members = sum(len(g.members) for g in bot.guilds)
-    embed.add_field(name="👤 Membros", value=total_members, inline=True)
-    
-    loaded_cogs = list(bot.cogs.keys())
-    embed.add_field(
-        name="📦 Módulos", 
-        value="\n".join([f"• {cog}" for cog in loaded_cogs]) if loaded_cogs else "Nenhum",
-        inline=False
-    )
-    
-    # Status do keep-alive
-    embed.add_field(
-        name="🌐 Keep-Alive",
-        value=f"✅ Ativo na porta 8080\n📊 Health check: `/health`",
-        inline=False
-    )
-    
-    embed.set_footer(text="Online 24/7 • Monitorado por UptimeRobot")
+    # Mostrar módulos carregados
+    cogs = list(bot.cogs.keys())
+    embed.add_field(name="📦 Módulos", value="\n".join(cogs) if cogs else "Nenhum", inline=False)
     
     await ctx.send(embed=embed)
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def reload(ctx):
-    """Recarrega módulos"""
     await load_cogs()
     await ctx.send("✅ Módulos recarregados!")
+
+# ==================== HELP PERSONALIZADO ====================
+@bot.command(name="help")
+async def custom_help(ctx, *, comando: str = None):
+    if comando:
+        cmd = bot.get_command(comando)
+        if not cmd:
+            await ctx.send(f"❌ Comando `{comando}` não encontrado!")
+            return
+        
+        embed = discord.Embed(
+            title=f"📖 Ajuda: !{cmd.name}",
+            description=cmd.help or "Sem descrição",
+            color=discord.Color.blue()
+        )
+        
+        if cmd.aliases:
+            embed.add_field(name="📌 Aliases", value=", ".join([f"`!{a}`" for a in cmd.aliases]), inline=False)
+        
+        await ctx.send(embed=embed)
+        return
+    
+    embed = discord.Embed(
+        title="🤖 Comandos do Bot",
+        description="Lista de todos os comandos:",
+        color=discord.Color.purple()
+    )
+    
+    for cog_name, cog in bot.cogs.items():
+        comandos = [cmd for cmd in cog.get_commands() if not cmd.hidden]
+        if comandos:
+            valor = " ".join([f"`!{cmd.name}`" for cmd in sorted(comandos, key=lambda x: x.name)])
+            embed.add_field(name=f"**{cog_name}**", value=valor, inline=False)
+    
+    await ctx.send(embed=embed)
 
 # ==================== TRATAMENTO DE ERROS ====================
 @bot.event
@@ -186,46 +171,35 @@ async def on_command_error(ctx, error):
         await ctx.send(f"❌ Comando não encontrado. Use `!help`", delete_after=5)
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ Sem permissão!", delete_after=5)
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Argumentos faltando! Use: `!{ctx.command.name} {ctx.command.signature}`", delete_after=5)
     else:
         print(f"Erro: {error}")
 
 # ==================== INICIALIZAÇÃO ====================
 async def main():
-    """Função principal"""
     print("🚀 Iniciando bot Discord...")
     print("=" * 50)
     
     TOKEN = os.getenv('DISCORD_TOKEN')
     if not TOKEN:
         print("❌ DISCORD_TOKEN não encontrado!")
-        print("Configure no Render: Environment → DISCORD_TOKEN")
         sys.exit(1)
     
-    # Iniciar keep-alive na porta 8080
     try:
-        print("🌐 Iniciando servidor keep-alive na porta 8080...")
         await keep_alive.start_simple()
     except Exception as e:
         print(f"⚠️ Erro no keep-alive: {e}")
-        print("⚠️ Continuando sem servidor web...")
     
-    # Carregar módulos
     await load_cogs()
     
-    # Iniciar bot
-    print("🔗 Conectando ao Discord...")
     try:
         await bot.start(TOKEN)
     finally:
-        # Garantir que o servidor web seja parado
         await keep_alive.stop()
 
 if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n👋 Bot encerrado pelo usuário")
+        print("\n👋 Bot encerrado")
     except Exception as e:
         print(f"❌ Erro fatal: {e}")
