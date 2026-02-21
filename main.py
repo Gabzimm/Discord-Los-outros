@@ -222,7 +222,6 @@ async def load_cogs():
     cogs = [
         'modules.sets',
         'modules.tickets',
-        'modules.config_cargos',
         'modules.painel_rec',
         'modules.cargos',
         'modules.premios',
