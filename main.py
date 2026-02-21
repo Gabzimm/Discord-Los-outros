@@ -187,6 +187,7 @@ async def load_cogs():
         'modules.sets',
         'modules.tickets',
         'modules.config_cargos',
+        'modules.painel_rec',
     ]
     
     carregados = 0
