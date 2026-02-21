@@ -7,7 +7,7 @@ import re
 
 # ========== CONFIGURAÇÃO ==========
 # ID do cargo base (deste para cima podem ver o painel)
-CARGO_BASE_ID = 1393998691354018094  # Substitua pelo ID do seu cargo
+CARGO_BASE_ID = 1393998691354018094
 
 # ========== FUNÇÕES AUXILIARES ==========
 def usuario_pode_ver_painel(member: discord.Member) -> bool:
@@ -19,13 +19,33 @@ def usuario_pode_ver_painel(member: discord.Member) -> bool:
     if member.guild_permissions.administrator:
         return True
     
+    # Buscar o gerenciador de cargos
+    cog = member.guild.get_cog("CargosManagerCog")
+    if not cog:
+        print("⚠️ CargosManagerCog não encontrado! Usando método alternativo...")
+        return verificar_por_posicao_direta(member)
+    
+    manager = cog.manager
+    
     # Buscar o cargo base
-    cargo_base = member.guild.get_role(CARGO_BASE_ID)
+    cargo_base = manager.get_cargo_por_id(member.guild.id, CARGO_BASE_ID)
     if not cargo_base:
         print(f"⚠️ Cargo base ID {CARGO_BASE_ID} não encontrado!")
         return False
     
     # Verificar se o membro tem algum cargo com posição >= cargo_base
+    for role in member.roles:
+        if role.position >= cargo_base.position:
+            return True
+    
+    return False
+
+def verificar_por_posicao_direta(member: discord.Member) -> bool:
+    """Método alternativo caso o CargosManager não esteja disponível"""
+    cargo_base = member.guild.get_role(CARGO_BASE_ID)
+    if not cargo_base:
+        return False
+    
     for role in member.roles:
         if role.position >= cargo_base.position:
             return True
@@ -491,6 +511,38 @@ class TicketsCog(commands.Cog):
                     value="\n".join(cargos_acima[:5]),
                     inline=False
                 )
+        
+        await ctx.send(embed=embed)
+    
+    @commands.command(name="testar_acesso")
+    @commands.has_permissions(administrator=True)
+    async def testar_acesso(self, ctx):
+        """Testa quais cargos têm acesso ao painel"""
+        cargo_base = ctx.guild.get_role(CARGO_BASE_ID)
+        if not cargo_base:
+            await ctx.send("❌ Cargo base não encontrado!")
+            return
+        
+        embed = discord.Embed(
+            title="🔍 Teste de Acesso ao Painel",
+            description=f"Cargo base: {cargo_base.mention} (posição: {cargo_base.position})",
+            color=discord.Color.blue()
+        )
+        
+        # Listar todos os cargos com posição >= base
+        cargos_com_acesso = []
+        for role in ctx.guild.roles:
+            if role.position >= cargo_base.position and role.name != "@everyone":
+                cargos_com_acesso.append(f"{role.mention} - pos: {role.position}")
+        
+        if cargos_com_acesso:
+            embed.add_field(
+                name="✅ Cargos com acesso",
+                value="\n".join(cargos_com_acesso[:15]),
+                inline=False
+            )
+        else:
+            embed.add_field(name="❌ Nenhum cargo", value="Nenhum cargo além do base encontrado!", inline=False)
         
         await ctx.send(embed=embed)
 
