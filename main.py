@@ -165,17 +165,6 @@ async def custom_help(ctx, *, comando: str = None):
     embed.set_footer(text=f"Total de comandos: {total_comandos} • Use !help [comando] para detalhes")
     
     await ctx.send(embed=embed)
-    
-    # Comandos do Painel de Recrutadores
-    embed.add_field(
-        name="🏆 **Painel de Recrutadores**",
-        value="`!setup_painel` `!rec_stats` `!rec_reset`",
-        inline=False
-    )
-    
-    embed.set_footer(text=f"Total de comandos: {len(bot.commands)}")
-    
-    await ctx.send(embed=embed)
 
 # ==================== COMANDOS GERAIS ====================
 @bot.command(name="ping")
