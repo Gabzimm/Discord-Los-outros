@@ -370,19 +370,22 @@ class SetsCog(commands.Cog, name="Sets"):
         embed = discord.Embed(
             title="🎮 **PEÇA SEU SET AQUI!**",
             description=(
-                "Clique no botão abaixo e preencha os dados:\n\n"
-                "**📝 Formulário:**\n"
-                "1️⃣ **Nick do Jogo** - Seu nome no FiveM\n"
-                "2️⃣ **ID do FiveM** - Seu identificador único\n"
-                "3️⃣ **ID do Recrutador (OBRIGATÓRIO)** - Quem te trouxe ao servidor\n\n"
-                f"**📋 Pedidos serão enviados para:** {canal.mention}"
+                 "Clique no botão abaixo e preencha os dados:\n\n"
+                "aprovamento para receber seu set\n"
+                "personalizado no servidor.\n\n"
+                "**📌 Instruções:**\n"
+                "1. Clique em **'Peça seu Set!'**\n"
+                "2. Digite seu **ID do Fivem**\n"
+                "3. Digite seu **Nick do Jogo**\n"
+                "4. Digite o **ID do Recrutador**\n"
+                "5. Aguarde aprovação da equipe\n\n"
             ),
             color=discord.Color.purple()
         )
         
         embed.add_field(
             name="🤝 Como encontrar ID do Recrutador?",
-            value="Procure no nickname da pessoa: `M | Nome | 123456`\nO número após o último '|' é o ID do FiveM",
+            value="Procure no nickname da pessoa: `rec | Nome | 9237`\nO número após o último '|' é o ID do FiveM",
             inline=False
         )
         
