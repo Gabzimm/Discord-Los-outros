@@ -115,7 +115,7 @@ async def custom_help(ctx, *, comando: str = None):
     
     embed = discord.Embed(
         title="🤖 Comandos do Bot",
-        description="Lista de todos os comandos:",
+        description="Lista de todos os comandos disponíveis:",
         color=discord.Color.purple()
     )
     
@@ -136,9 +136,35 @@ async def custom_help(ctx, *, comando: str = None):
     # Comandos de Tickets
     embed.add_field(
         name="🎫 **Tickets**",
-        value="`!setup_tickets`",
+        value="`!setup_tickets` `!verificar_acesso` `!listar_cargos`",
         inline=False
     )
+    
+    # Comandos do Painel de Recrutadores
+    embed.add_field(
+        name="🏆 **Painel de Recrutadores**",
+        value="`!setup_painel` `!rec_stats` `!rec_reset`",
+        inline=False
+    )
+    
+    # Comandos de Cargos
+    embed.add_field(
+        name="⚙️ **Cargos**",
+        value="`!setup_cargos` `!fixnick`",
+        inline=False
+    )
+    
+    # Comandos de Configuração (Admin)
+    embed.add_field(
+        name="🛠️ **Configuração (Admin)**",
+        value="`!reload` `!cargos_cache` `!recarregar_cache` `!buscar_cargo`",
+        inline=False
+    )
+    
+    total_comandos = len(bot.commands)
+    embed.set_footer(text=f"Total de comandos: {total_comandos} • Use !help [comando] para detalhes")
+    
+    await ctx.send(embed=embed)
     
     # Comandos do Painel de Recrutadores
     embed.add_field(
