@@ -229,7 +229,6 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             if recrutador_member.nick:
                 partes = recrutador_member.nick.split(' | ')
                 recrutador_nome = partes[1] if len(partes) >= 2 else recrutador_member.nick
-                
             else:
                 recrutador_nome = recrutador_member.name
 
@@ -242,10 +241,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                     interaction.user.id,  # ID do recruta
                     interaction.user.name  # Nome do recruta
                 )
-
-            descricao = (
-                f"**👤 Discord:** {interaction.user.mention}\n"
-
+            
             descricao = (
                 f"**👤 Discord:** {interaction.user.mention}\n"
                 f"**🆔 Discord ID:** `{interaction.user.id}`\n"
