@@ -6,6 +6,23 @@ import sys
 import asyncio
 import aiohttp
 from aiohttp import web
+import socket
+
+# ==================== VERIFICAÇÃO DE INSTÂNCIA ÚNICA ====================
+def verificar_instancia_unica():
+    """Garante que apenas uma instância do bot rode"""
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind('\0bot_jugadores_unico')
+        return True
+    except socket.error:
+        print("❌ ERRO: Já existe uma instância do bot rodando!")
+        print("   Execute: pkill -f python")
+        print("   Depois: python main.py")
+        return False
+
+if not verificar_instancia_unica():
+    sys.exit(1)
 
 # ==================== KEEP-ALIVE ====================
 class KeepAliveServer:
@@ -19,7 +36,7 @@ class KeepAliveServer:
             self.app = web.Application()
             
             async def handle(request):
-                return web.Response(text="🤖 Bot Discord Online")
+                return web.Response(text="🤖 Bot Discord Online - Jugadores")
             
             async def handle_health(request):
                 return web.json_response({
@@ -52,38 +69,11 @@ intents.message_content = True
 intents.members = True
 intents.guilds = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 keep_alive = KeepAliveServer()
 
-# ==================== DICIONÁRIO GLOBAL DE CANAIS ====================
-# Isso será compartilhado entre todos os módulos
-canais_aprovacao = {}  # {guild_id: channel_id}
-
-# ==================== CARREGAR MÓDULOS ====================
-async def load_cogs():
-    print("=" * 50)
-    print("🔄 CARREGANDO MÓDULOS...")
-    
-    # Lista de módulos para carregar
-    cogs = [
-        'config_cargos.py',
-        'modules.tickets',
-        'modules.sets',
-        'modules.cargos',  
-    ]
-    
-    carregados = 0
-    for cog in cogs:
-        print(f"\n🔍 Tentando: {cog}")
-        try:
-            await bot.load_extension(cog)
-            print(f"✅ '{cog}' carregado!")
-            carregados += 1
-        except Exception as e:
-            print(f"❌ Erro: {type(e).__name__}: {e}")
-    
-    print(f"\n📊 {carregados}/{len(cogs)} módulos carregados")
-    print("=" * 50)
+# Dicionário global de canais (compartilhado entre módulos)
+canais_aprovacao = {}
 
 # ==================== EVENTOS ====================
 @bot.event
@@ -97,37 +87,11 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
-            name=f"{len(bot.guilds)} servidor(es) | !help"
+            name="Jugadores | !help"
         )
     )
     
-    # NÃO registre views aqui! Cada cog registra as suas próprias
     print("✅ Sistema de persistência ativo!")
-
-# ==================== COMANDOS ====================
-@bot.command()
-async def ping(ctx):
-    latency = round(bot.latency * 1000)
-    await ctx.send(f"🏓 Pong! Latência: **{latency}ms**")
-
-@bot.command()
-async def status(ctx):
-    embed = discord.Embed(title="🤖 Status do Bot", color=discord.Color.green())
-    embed.add_field(name="🏷️ Nome", value=bot.user.name, inline=True)
-    embed.add_field(name="📡 Ping", value=f"{round(bot.latency * 1000)}ms", inline=True)
-    embed.add_field(name="🏠 Servidores", value=len(bot.guilds), inline=True)
-    
-    # Mostrar módulos carregados
-    cogs = list(bot.cogs.keys())
-    embed.add_field(name="📦 Módulos", value="\n".join(cogs) if cogs else "Nenhum", inline=False)
-    
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def reload(ctx):
-    await load_cogs()
-    await ctx.send("✅ Módulos recarregados!")
 
 # ==================== HELP PERSONALIZADO ====================
 @bot.command(name="help")
@@ -156,23 +120,104 @@ async def custom_help(ctx, *, comando: str = None):
         color=discord.Color.purple()
     )
     
-    for cog_name, cog in bot.cogs.items():
-        comandos = [cmd for cmd in cog.get_commands() if not cmd.hidden]
-        if comandos:
-            valor = " ".join([f"`!{cmd.name}`" for cmd in sorted(comandos, key=lambda x: x.name)])
-            embed.add_field(name=f"**{cog_name}**", value=valor, inline=False)
+    # Comandos Gerais
+    embed.add_field(
+        name="📌 **Gerais**",
+        value="`!ping` `!status` `!help`",
+        inline=False
+    )
+    
+    # Comandos de Sets
+    embed.add_field(
+        name="🎮 **Sets**",
+        value="`!setup_set` `!aprovamento` `!check_id` `!sets_pendentes`",
+        inline=False
+    )
+    
+    # Comandos de Tickets
+    embed.add_field(
+        name="🎫 **Tickets**",
+        value="`!setup_tickets`",
+        inline=False
+    )
+    
+    embed.set_footer(text=f"Total de comandos: {len(bot.commands)}")
     
     await ctx.send(embed=embed)
+
+# ==================== COMANDOS GERAIS ====================
+@bot.command(name="ping")
+async def ping(ctx):
+    """Mostra a latência do bot"""
+    latency = round(bot.latency * 1000)
+    await ctx.send(f"🏓 Pong! Latência: **{latency}ms**")
+
+@bot.command(name="status")
+async def status(ctx):
+    """Mostra o status do bot"""
+    embed = discord.Embed(
+        title="🤖 Status do Bot",
+        color=discord.Color.green()
+    )
+    
+    embed.add_field(name="🏷️ Nome", value=bot.user.name, inline=True)
+    embed.add_field(name="🆔 ID", value=bot.user.id, inline=True)
+    embed.add_field(name="📡 Ping", value=f"{round(bot.latency * 1000)}ms", inline=True)
+    embed.add_field(name="🏠 Servidores", value=len(bot.guilds), inline=True)
+    
+    # Mostrar módulos carregados
+    cogs = list(bot.cogs.keys())
+    if cogs:
+        embed.add_field(name="📦 Módulos Ativos", value="\n".join(cogs), inline=False)
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name="reload")
+@commands.has_permissions(administrator=True)
+async def reload_cogs(ctx):
+    """Recarrega todos os módulos (apenas admin)"""
+    await load_cogs()
+    await ctx.send("✅ Módulos recarregados!")
+
+# ==================== CARREGAR MÓDULOS ====================
+async def load_cogs():
+    print("=" * 50)
+    print("🔄 CARREGANDO MÓDULOS...")
+    
+    cogs = [
+        'modules.sets',
+        'modules.tickets',
+    ]
+    
+    carregados = 0
+    for cog in cogs:
+        print(f"\n🔍 Tentando: {cog}")
+        try:
+            await bot.load_extension(cog)
+            print(f"✅ '{cog}' carregado!")
+            carregados += 1
+        except commands.ExtensionAlreadyLoaded:
+            print(f"⚠️ '{cog}' já estava carregado")
+            carregados += 1
+        except Exception as e:
+            print(f"❌ Erro: {type(e).__name__}: {e}")
+    
+    print(f"\n📊 {carregados}/{len(cogs)} módulos carregados")
+    print("=" * 50)
+    return carregados > 0
 
 # ==================== TRATAMENTO DE ERROS ====================
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
-        await ctx.send(f"❌ Comando não encontrado. Use `!help`", delete_after=5)
+        # Ignorar comandos não encontrados (sem resposta)
+        pass
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ Sem permissão!", delete_after=5)
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Argumento faltando! Use `!help {ctx.command.name}`", delete_after=5)
     else:
-        print(f"Erro: {error}")
+        print(f"❌ Erro: {error}")
 
 # ==================== INICIALIZAÇÃO ====================
 async def main():
@@ -182,19 +227,25 @@ async def main():
     TOKEN = os.getenv('DISCORD_TOKEN')
     if not TOKEN:
         print("❌ DISCORD_TOKEN não encontrado!")
+        print("Configure no Render: Environment → DISCORD_TOKEN")
         sys.exit(1)
     
     try:
+        print("🌐 Iniciando servidor keep-alive...")
         await keep_alive.start_simple()
     except Exception as e:
         print(f"⚠️ Erro no keep-alive: {e}")
     
     await load_cogs()
     
+    print("🔗 Conectando ao Discord...")
     try:
         await bot.start(TOKEN)
+    except KeyboardInterrupt:
+        print("\n👋 Bot encerrado pelo usuário")
     finally:
         await keep_alive.stop()
+        await bot.close()
 
 if __name__ == '__main__':
     try:
