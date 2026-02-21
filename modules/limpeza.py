@@ -143,8 +143,8 @@ class LimpezaQuantidadeModal(ui.Modal, title="🧹 Limpar por Quantidade"):
     
     quantidade = ui.TextInput(
         label="Quantidade de mensagens:",
-        placeholder="Ex: 50 (máximo 100)",
-        required=True,
+        placeholder="Ex: 50 (máximo 999)",
+        required=False,
         max_length=3
     )
     
