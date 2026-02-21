@@ -64,47 +64,6 @@ intents.guilds = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 keep_alive = KeepAliveServer()
 
-# ==================== EVENTO DE ENTRADA DE MEMBRO (SEM MENSAGEM) ====================
-@bot.event
-async def on_member_join(member: discord.Member):
-    """Atribui cargo automático quando alguém entra - SEM MENSAGEM"""
-    print(f"👤 {member.name} entrou no servidor!")
-    
-    try:
-        # Buscar cargo "𝐕𝐢𝐬𝐢𝐭𝐚𝐧𝐭𝐞"
-        visitante_role = discord.utils.get(member.guild.roles, name="𝐕𝐢𝐬𝐢𝐭𝐚𝐧𝐭𝐞")
-        
-        if not visitante_role:
-            print("❌ Cargo '𝐕𝐢𝐬𝐢𝐭𝐚𝐧𝐭𝐞' não encontrado!")
-            
-            # Tentar criar automaticamente
-            try:
-                visitante_role = await member.guild.create_role(
-                    name="𝐕𝐢𝐬𝐢𝐭𝐚𝐧𝐭𝐞",
-                    color=discord.Color.light_grey(),
-                    reason="Criado automaticamente pelo sistema de boas-vindas"
-                )
-                print(f"✅ Cargo '𝐕𝐢𝐬𝐢𝐭𝐚𝐧𝐭𝐞' criado automaticamente!")
-            except discord.Forbidden:
-                print("❌ Sem permissão para criar cargo!")
-                return
-            except Exception as e:
-                print(f"❌ Erro ao criar cargo: {e}")
-                return
-                
-        # Dar o cargo ao membro (SOMENTE O CARGO - SEM MENSAGEM)
-        await member.add_roles(visitante_role)
-        print(f"✅ Cargo '𝐕𝐢𝐬𝐢𝐭𝐚𝐧𝐭𝐞' atribuído a {member.name}")
-        
-        # REMOVIDO: Toda a parte de enviar mensagem de boas-vindas
-        
-        print(f"✅ {member.name} recebeu cargo automático")
-        
-    except discord.Forbidden:
-        print(f"❌ Sem permissão para adicionar cargos a {member.name}")
-    except Exception as e:
-        print(f"❌ Erro no sistema de boas-vindas: {type(e).__name__}: {e}")
-
 # ==================== CARREGAR MÓDULOS ====================
 async def load_cogs():
     """Carrega módulos adicionais"""
@@ -113,6 +72,7 @@ async def load_cogs():
     
     # Lista de módulos
     cogs = [
+        'config_cargos.py',
         'modules.tickets',
         'modules.sets',
         'modules.cargos',
