@@ -1,3 +1,6 @@
+print("🔴 INICIANDO CARREGAMENTO DO SETS.PY")
+import sys
+print(f"🔴 Python path: {sys.path}")
 import discord
 from discord.ext import commands
 from discord import ui, ButtonStyle
