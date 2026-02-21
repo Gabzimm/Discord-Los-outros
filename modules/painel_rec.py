@@ -139,11 +139,12 @@ class GerenciadorRecrutadores:
 class RecrutasPagosView(ui.View):
     """View para mostrar e gerenciar recrutas de um recrutador"""
     
-    def __init__(self, gerenciador, recrutador_id, recrutador_nome):
+    def __init__(self, gerenciador, recrutador_id, recrutador_nome, recrutador_member=None):
         super().__init__(timeout=120)  # 2 minutos de timeout
         self.gerenciador = gerenciador
         self.recrutador_id = recrutador_id
         self.recrutador_nome = recrutador_nome
+        self.recrutador_member = recrutador_member
         self.pagina = 0
         self.recrutas_por_pagina = 5
     
@@ -152,8 +153,14 @@ class RecrutasPagosView(ui.View):
         recrutas = self.gerenciador.get_recrutas_por_recrutador(self.recrutador_id)
         
         if not recrutas:
+            # Título com menção se possível
+            if self.recrutador_member:
+                titulo = f"📋 Recrutas de {self.recrutador_member.mention}"
+            else:
+                titulo = f"📋 Recrutas de {self.recrutador_nome}"
+            
             embed = discord.Embed(
-                title=f"📋 Recrutas de {self.recrutador_nome}",
+                title=titulo,
                 description="Este recrutador ainda não tem recrutas.",
                 color=discord.Color.blue()
             )
@@ -168,16 +175,30 @@ class RecrutasPagosView(ui.View):
         total_pagos = sum(1 for r in recrutas if r["pago"])
         total_recrutas = len(recrutas)
         
+        # Título com menção se possível
+        if self.recrutador_member:
+            titulo = f"📋 Recrutas de {self.recrutador_member.mention}"
+        else:
+            titulo = f"📋 Recrutas de {self.recrutador_nome}"
+        
         embed = discord.Embed(
-            title=f"📋 Recrutas de {self.recrutador_nome}",
+            title=titulo,
             description=f"Total: **{total_recrutas}** recrutas | Pagos: **{total_pagos}**",
             color=discord.Color.blue()
         )
         
         for recruta in recrutas_pagina:
             status = "✅ PAGO" if recruta["pago"] else "⏳ PAGAR"
+            
+            # Tentar buscar o membro para mencionar (se for no mesmo servidor)
+            recruta_mention = recruta["nome"]
+            if self.recrutador_member and self.recrutador_member.guild:
+                membro = self.recrutador_member.guild.get_member(int(recruta["id"]))
+                if membro:
+                    recruta_mention = membro.mention
+            
             embed.add_field(
-                name=f"{recruta['nome']}",
+                name=recruta_mention,
                 value=f"Status: {status}\nData: {recruta['data']}",
                 inline=False
             )
@@ -221,7 +242,7 @@ class RecrutasPagosView(ui.View):
         recrutas_pagina = recrutas[self.pagina * self.recrutas_por_pagina:(self.pagina + 1) * self.recrutas_por_pagina]
         
         # Criar select menu para escolher recruta
-        select = RecrutaSelect(self.gerenciador, recrutas_pagina, self)
+        select = RecrutaSelect(self.gerenciador, recrutas_pagina, self, interaction.guild)
         view = ui.View(timeout=60)
         view.add_item(select)
         
@@ -234,16 +255,23 @@ class RecrutasPagosView(ui.View):
 class RecrutaSelect(ui.Select):
     """Select menu para escolher recruta"""
     
-    def __init__(self, gerenciador, recrutas, view_principal):
+    def __init__(self, gerenciador, recrutas, view_principal, guild):
         self.gerenciador = gerenciador
         self.view_principal = view_principal
+        self.guild = guild
         
         options = []
         for recruta in recrutas:
             if not recruta["pago"]:  # Só mostrar não pagos
+                # Tentar usar menção no label
+                label = recruta["nome"][:100]
+                membro = guild.get_member(int(recruta["id"]))
+                if membro:
+                    label = membro.display_name[:100]
+                
                 options.append(
                     discord.SelectOption(
-                        label=recruta["nome"][:100],
+                        label=label,
                         value=recruta["id"],
                         description=f"Recrutado em {recruta['data']}"
                     )
@@ -278,7 +306,7 @@ class RecrutaSelect(ui.Select):
         await self.view_principal.atualizar_view(interaction)
         
         await interaction.response.send_message("✅ Recruta marcado como PAGO com sucesso!", ephemeral=True)
-
+    
     async def atualizar_view(self, interaction):
         """Atualiza a view principal"""
         await interaction.edit_original_response(
@@ -312,15 +340,21 @@ class PainelRecView(ui.View):
         
         options = []
         for rec in top_recrutadores:
+            # Tentar buscar o membro para ter a menção no label
+            label = f"{rec['nome']} - {rec['total']} recrutas"
+            membro = interaction.guild.get_member(int(rec['id']))
+            if membro:
+                label = f"{membro.display_name} - {rec['total']} recrutas"
+            
             options.append(
                 discord.SelectOption(
-                    label=f"{rec['nome']} - {rec['total']} recrutas",
+                    label=label,
                     value=rec['id'],
                     description=f"Total: {rec['total']} recrutas"
                 )
             )
         
-        select = RecrutadorSelect(self.gerenciador, options)
+        select = RecrutadorSelect(self.gerenciador, options, interaction.guild)
         view = ui.View(timeout=60)
         view.add_item(select)
         
@@ -333,8 +367,9 @@ class PainelRecView(ui.View):
 class RecrutadorSelect(ui.Select):
     """Select menu para escolher recrutador"""
     
-    def __init__(self, gerenciador, options):
+    def __init__(self, gerenciador, options, guild):
         self.gerenciador = gerenciador
+        self.guild = guild
         super().__init__(
             placeholder="Escolha um recrutador...",
             min_values=1,
@@ -345,13 +380,16 @@ class RecrutadorSelect(ui.Select):
     async def callback(self, interaction: discord.Interaction):
         recrutador_id = self.values[0]
         
+        # Buscar o membro pelo ID para ter a menção
+        recrutador_member = self.guild.get_member(int(recrutador_id))
+        
         # Buscar nome do recrutador
         recrutador_nome = "Desconhecido"
         if recrutador_id in self.gerenciador.recrutadores:
             recrutador_nome = self.gerenciador.recrutadores[recrutador_id]["nome"]
         
-        # Criar view de recrutas
-        view_recrutas = RecrutasPagosView(self.gerenciador, recrutador_id, recrutador_nome)
+        # Criar view de recrutas (passando o member para ter a menção)
+        view_recrutas = RecrutasPagosView(self.gerenciador, recrutador_id, recrutador_nome, recrutador_member)
         embed = view_recrutas.criar_embed()
         
         await interaction.response.edit_message(
@@ -389,6 +427,12 @@ class PainelRecCog(commands.Cog, name="PainelRec"):
         else:
             # Top 3 com medalhas
             for i, rec in enumerate(top[:3], 1):
+                # Tentar buscar o membro para menção
+                display_nome = rec['nome']
+                membro = guild.get_member(int(rec['id']))
+                if membro:
+                    display_nome = membro.mention
+                
                 if i == 1:
                     medalha = "🥇 **1º Lugar**"
                     cor = "🥇"
@@ -401,7 +445,7 @@ class PainelRecCog(commands.Cog, name="PainelRec"):
                 
                 embed.add_field(
                     name=f"{medalha}",
-                    value=f"**{rec['nome']}**\n{cor} `{rec['total']}` recruta(s)",
+                    value=f"{display_nome}\n{cor} `{rec['total']}` recruta(s)",
                     inline=False
                 )
             
@@ -409,7 +453,11 @@ class PainelRecCog(commands.Cog, name="PainelRec"):
             if len(top) > 3:
                 outros = ""
                 for i, rec in enumerate(top[3:], 4):
-                    outros += f"`{i}º` **{rec['nome']}** — `{rec['total']}` recruta(s)\n"
+                    display_nome = rec['nome']
+                    membro = guild.get_member(int(rec['id']))
+                    if membro:
+                        display_nome = membro.mention
+                    outros += f"`{i}º` {display_nome} — `{rec['total']}` recruta(s)\n"
                 
                 embed.add_field(
                     name="📋 **Demais Posições**",
@@ -580,7 +628,11 @@ class PainelRecCog(commands.Cog, name="PainelRec"):
         if top:
             top_text = ""
             for i, rec in enumerate(top, 1):
-                top_text += f"`{i}º` **{rec['nome']}** — `{rec['total']}` recruta(s)\n"
+                display_nome = rec['nome']
+                membro = ctx.guild.get_member(int(rec['id']))
+                if membro:
+                    display_nome = membro.mention
+                top_text += f"`{i}º` {display_nome} — `{rec['total']}` recruta(s)\n"
             
             embed.add_field(name="🏆 Top 3 Recrutadores", value=top_text, inline=False)
         
