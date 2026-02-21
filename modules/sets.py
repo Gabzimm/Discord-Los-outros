@@ -310,7 +310,20 @@ class SetsCog(commands.Cog, name="Sets"):
             description=f"Os pedidos de set agora serão enviados para: {canal.mention}",
             color=discord.Color.green()
         )
-        await ctx.send(embed=embed)
+        
+        # Enviar mensagem de confirmação e guardar ela
+        msg_confirmacao = await ctx.send(embed=embed)
+        
+        # Aguardar 3 segundos
+        await asyncio.sleep(3)
+        
+        # Apagar o comando do usuário e a mensagem de confirmação
+        try:
+            await ctx.message.delete()  # Apaga o !aprovamento
+            await msg_confirmacao.delete()  # Apaga a confirmação
+        except:
+            pass  # Se não conseguir apagar, ignora
+        
         print(f"✅ Canal de aprovação definido: #{canal.name} em {ctx.guild.name}")
     
     @commands.command(name="setup_set", aliases=["setupset"])
@@ -349,7 +362,7 @@ class SetsCog(commands.Cog, name="Sets"):
         embed = discord.Embed(
             title="🎮 **PEÇA SEU SET AQUI!**",
             description=(
-               "Clique no botão abaixo e preencha os dados:\n\n"
+                "Clique no botão abaixo e preencha os dados:\n\n"
                 "aprovamento para receber seu set\n"
                 "personalizado no servidor.\n\n"
                 "**📌 Instruções:**\n"
