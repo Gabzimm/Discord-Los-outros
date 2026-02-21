@@ -216,19 +216,29 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                             await interaction.followup.send(f"❌ ID `{self.id_fivem.value}` já está em uso!", ephemeral=True)
                             return
             
-            # Processar recrutador (agora sempre preenchido)
-            recrutador_nome = None
-            recrutador_member = None
-            
+            # Processar recrutador - VERIFICAR SE EXISTE
             recrutador_member = buscar_usuario_por_id_fivem(interaction.guild, self.recrutador.value)
-            if recrutador_member:
-                if recrutador_member.nick:
-                    partes = recrutador_member.nick.split(' | ')
-                    recrutador_nome = partes[1] if len(partes) >= 2 else recrutador_member.nick
-                else:
-                    recrutador_nome = recrutador_member.name
+            
+            # SE NÃO ENCONTRAR O RECRUTADOR, DAR ERRO
+            if not recrutador_member:
+                await interaction.followup.send(
+                    f"❌ **RECRUTADOR NÃO ENCONTRADO!**\n\n"
+                    f"Não existe nenhum membro com o ID FiveM `{self.recrutador.value}` no servidor.\n\n"
+                    f"**Verifique:**\n"
+                    f"• O ID digitado está correto?\n"
+                    f"• A pessoa já fez o set e está com o nickname no formato `M | Nome | ID`?\n"
+                    f"• Peça ajuda para um staff se necessário.",
+                    ephemeral=True
+                )
+                return
+            
+            # Se encontrou, processa normalmente
+            recrutador_nome = None
+            if recrutador_member.nick:
+                partes = recrutador_member.nick.split(' | ')
+                recrutador_nome = partes[1] if len(partes) >= 2 else recrutador_member.nick
             else:
-                recrutador_nome = f"ID: {self.recrutador.value}"
+                recrutador_nome = recrutador_member.name
             
             descricao = (
                 f"**👤 Discord:** {interaction.user.mention}\n"
@@ -238,9 +248,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 f"**📅 Data:** {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
             )
             
-            descricao += f"\n**🤝 Recrutado por:** {recrutador_nome}"
-            if recrutador_member:
-                descricao += f" ({recrutador_member.mention})"
+            descricao += f"\n**🤝 Recrutado por:** {recrutador_nome} ({recrutador_member.mention})"
             
             descricao += "\n\n**⏳ Status:** Aguardando aprovação"
             
@@ -363,21 +371,18 @@ class SetsCog(commands.Cog, name="Sets"):
             title="🎮 **PEÇA SEU SET AQUI!**",
             description=(
                 "Clique no botão abaixo e preencha os dados:\n\n"
-                "aprovamento para receber seu set\n"
-                "personalizado no servidor.\n\n"
-                "**📌 Instruções:**\n"
-                "1. Clique em **'Peça seu Set!'**\n"
-                "2. Digite seu **ID do Fivem**\n"
-                "3. Digite seu **Nick do Jogo**\n"
-                "4. Digite o **ID do Recrutador**\n"
-                "5. Aguarde aprovação da equipe\n\n"
+                "**📝 Formulário:**\n"
+                "1️⃣ **Nick do Jogo** - Seu nome no FiveM\n"
+                "2️⃣ **ID do FiveM** - Seu identificador único\n"
+                "3️⃣ **ID do Recrutador (OBRIGATÓRIO)** - Quem te trouxe ao servidor\n\n"
+                f"**📋 Pedidos serão enviados para:** {canal.mention}"
             ),
             color=discord.Color.purple()
         )
         
         embed.add_field(
             name="🤝 Como encontrar ID do Recrutador?",
-            value="Procure no nickname da pessoa: `rec | Nome | 9237`\nO número após o último '|' é o ID do FiveM",
+            value="Procure no nickname da pessoa: `M | Nome | 123456`\nO número após o último '|' é o ID do FiveM",
             inline=False
         )
         
