@@ -7,9 +7,6 @@ import re
 
 # ========== CONFIGURAÇÃO ==========
 CARGO_BASE_APROVACAO_ID = 1421254143103996045
-
-# Dicionário para armazenar o canal de aprovação de cada servidor
-# Formato: {guild_id: channel_id}
 canais_aprovacao = {}
 
 def usuario_pode_aprovar(member: discord.Member) -> bool:
@@ -228,7 +225,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 else:
                     recrutador_nome = f"ID: {recrutador_fivem_id}"
             
-            # BUSCAR CANAL DE APROVAÇÃO DO DICIONÁRIO
+            # BUSCAR CANAL DE APROVAÇÃO
             canal_id = canais_aprovacao.get(interaction.guild.id)
             if not canal_id:
                 await interaction.followup.send(
@@ -294,7 +291,10 @@ class SetOpenView(ui.View):
         modal = SetForm()
         await interaction.response.send_modal(modal)
 
-class SetsCog(commands.Cog):
+# ========== COG DO SISTEMA DE SET ==========
+
+class SetsCog(commands.Cog, name="Sets"):
+    """📋 Sistema de Sets e Recrutamentos"""
     def __init__(self, bot):
         self.bot = bot
         print("✅ Módulo Sets carregado!")
@@ -304,27 +304,10 @@ class SetsCog(commands.Cog):
         self.bot.add_view(SetOpenView())
         print("✅ Views de Sets registradas!")
     
-    @commands.command(name="aprovamento", aliases=["aprov"])
-    @commands.has_permissions(administrator=True)
-    async def set_aprovamento(self, ctx, canal: discord.TextChannel = None):
-        """Define o canal de aprovação de sets"""
-        if not canal:
-            canal = ctx.channel
-        
-        canais_aprovacao[ctx.guild.id] = canal.id
-        
-        embed = discord.Embed(
-            title="✅ Canal de Aprovação Definido",
-            description=f"Os pedidos de set agora serão enviados para: {canal.mention}",
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
-        print(f"✅ Canal de aprovação definido: #{canal.name} em {ctx.guild.name}")
-    
-    @commands.command()
+    @commands.command(name="setup_set", aliases=["setupset"])
     @commands.has_permissions(administrator=True)
     async def setup_set(self, ctx):
-        """Configura o painel de pedido de set"""
+        """🎮 Configura o painel de pedido de set"""
         
         # Verificar se já tem canal de aprovação
         if ctx.guild.id not in canais_aprovacao:
@@ -371,9 +354,26 @@ class SetsCog(commands.Cog):
         await ctx.send(embed=embed, view=view)
         await ctx.message.delete()
     
-    @commands.command()
+    @commands.command(name="aprovamento", aliases=["aprov", "setchannel"])
+    @commands.has_permissions(administrator=True)
+    async def set_aprovamento(self, ctx, canal: discord.TextChannel = None):
+        """📌 Define o canal de aprovação de sets"""
+        if not canal:
+            canal = ctx.channel
+        
+        canais_aprovacao[ctx.guild.id] = canal.id
+        
+        embed = discord.Embed(
+            title="✅ Canal de Aprovação Definido",
+            description=f"Os pedidos de set agora serão enviados para: {canal.mention}",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+        print(f"✅ Canal de aprovação definido: #{canal.name} em {ctx.guild.name}")
+    
+    @commands.command(name="check_id", aliases=["checkid", "verificarid"])
     async def check_id(self, ctx, *, fivem_id: str):
-        """Verifica se um ID Fivem já está em uso"""
+        """🔍 Verifica se um ID Fivem já está em uso"""
         canal_id = canais_aprovacao.get(ctx.guild.id)
         if not canal_id:
             await ctx.send("❌ Canal de aprovação não configurado! Use `!aprovamento #canal` primeiro.")
@@ -398,10 +398,10 @@ class SetsCog(commands.Cog):
         if not encontrado:
             await ctx.send(f"✅ ID `{fivem_id}` não está em uso!")
     
-    @commands.command()
+    @commands.command(name="sets_pendentes", aliases=["pendentes", "listasets"])
     @commands.has_permissions(administrator=True)
     async def sets_pendentes(self, ctx):
-        """Mostra pedidos pendentes"""
+        """📋 Mostra pedidos pendentes de set"""
         canal_id = canais_aprovacao.get(ctx.guild.id)
         if not canal_id:
             await ctx.send("❌ Canal de aprovação não configurado! Use `!aprovamento #canal` primeiro.")
