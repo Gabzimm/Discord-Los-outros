@@ -153,6 +153,13 @@ async def custom_help(ctx, *, comando: str = None):
         value="`!premio @user [rec/farm/pista]` `!premio @user` `!premios`",
         inline=False
     )
+
+    # comando para limpar canais
+    embed.add_field(
+        name="🧹 **Limpeza**",
+        value="`!limpar` `!limpar 50` `!limpar canal #geral 30`",
+        inline=False
+    )
     
     # Comandos de Cargos
     embed.add_field(
@@ -219,6 +226,7 @@ async def load_cogs():
         'modules.painel_rec',
         'modules.cargos',
         'modules.premios',
+        'modules.limpeza',
     ]
     
     carregados = 0
