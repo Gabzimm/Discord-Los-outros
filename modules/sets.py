@@ -233,13 +233,18 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             else:
                 recrutador_nome = recrutador_member.name
 
-            # Adicionar ao painel de recrutadores
+            # Adicionar ao painel de recrutadores (com ID do recruta)
             painel_cog = interaction.client.get_cog("PainelRec")
             if painel_cog:
                 painel_cog.adicionar_recrutamento(
                     recrutador_member.id,
-                    recrutador_nome
+                    recrutador_nome,
+                    interaction.user.id,  # ID do recruta
+                    interaction.user.name  # Nome do recruta
                 )
+
+            descricao = (
+                f"**👤 Discord:** {interaction.user.mention}\n"
 
             descricao = (
                 f"**👤 Discord:** {interaction.user.mention}\n"
