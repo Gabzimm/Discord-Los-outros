@@ -168,7 +168,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
     )
     
     recrutador = ui.TextInput(
-        label="3. ID de quem te recrutou:",
+        label="3. ID de quem te recrutou (OBRIGATÓRIO):",
         placeholder="Ex: 9237",
         required=True,
         max_length=20
@@ -318,7 +318,6 @@ class SetsCog(commands.Cog, name="Sets"):
     async def setup_set(self, ctx):
         """🎮 Configura o painel de pedido de set"""
         
-        # VERIFICAR SE CANAL ESTÁ CONFIGURADO
         if ctx.guild.id not in canais_aprovacao:
             embed_aviso = discord.Embed(
                 title="⚠️ Configure o Canal de Aprovação Primeiro!",
@@ -330,27 +329,27 @@ class SetsCog(commands.Cog, name="Sets"):
                 color=discord.Color.orange()
             )
             
-            # Enviar mensagem de aviso
+            # Enviar mensagem de aviso e guardar ela
             msg_aviso = await ctx.send(embed=embed_aviso)
             
-            # Apagar o comando do usuário e a mensagem de aviso após 3 segundos
+            # Aguardar 3 segundos
             await asyncio.sleep(3)
             
+            # Apagar o comando do usuário e a mensagem de aviso
             try:
-                await ctx.message.delete()  # Apaga o comando !setup_set
-                await msg_aviso.delete()     # Apaga a mensagem de aviso
+                await ctx.message.delete()  # Apaga o !setup_set
+                await msg_aviso.delete()    # Apaga o aviso
             except:
                 pass  # Se não conseguir apagar, ignora
             
             return
         
-        # SE CANAL ESTÁ CONFIGURADO, CONTINUA NORMALMENTE
         canal = ctx.guild.get_channel(canais_aprovacao[ctx.guild.id])
         
         embed = discord.Embed(
             title="🎮 **PEÇA SEU SET AQUI!**",
             description=(
-                "Clique no botão abaixo e preencha os dados:\n\n"
+               "Clique no botão abaixo e preencha os dados:\n\n"
                 "aprovamento para receber seu set\n"
                 "personalizado no servidor.\n\n"
                 "**📌 Instruções:**\n"
@@ -365,7 +364,7 @@ class SetsCog(commands.Cog, name="Sets"):
         
         embed.add_field(
             name="🤝 Como encontrar ID do Recrutador?",
-            value="Procure no nickname da pessoa: `Rec | Nome | 9237`\nO número após o último '|' é o ID do FiveM",
+            value="Procure no nickname da pessoa: `rec | Nome | 9237`\nO número após o último '|' é o ID do FiveM",
             inline=False
         )
         
@@ -374,12 +373,7 @@ class SetsCog(commands.Cog, name="Sets"):
         
         view = SetOpenView()
         await ctx.send(embed=embed, view=view)
-        
-        # Apagar o comando do usuário
-        try:
-            await ctx.message.delete()
-        except:
-            pass
+        await ctx.message.delete()
     
     @commands.command(name="check_id", aliases=["checkid"])
     async def check_id(self, ctx, id_fivem: str):
