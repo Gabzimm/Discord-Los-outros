@@ -229,9 +229,17 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             if recrutador_member.nick:
                 partes = recrutador_member.nick.split(' | ')
                 recrutador_nome = partes[1] if len(partes) >= 2 else recrutador_member.nick
-            else:
+                        else:
                 recrutador_nome = recrutador_member.name
-            
+
+            # Adicionar ao painel de recrutadores
+            painel_cog = interaction.client.get_cog("PainelRec")
+            if painel_cog:
+                painel_cog.adicionar_recrutamento(
+                    recrutador_member.id,
+                    recrutador_nome
+                )
+
             descricao = (
                 f"**👤 Discord:** {interaction.user.mention}\n"
                 f"**🆔 Discord ID:** `{interaction.user.id}`\n"
