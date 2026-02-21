@@ -5,43 +5,43 @@ import asyncio
 from datetime import datetime
 import re
 
-# ========== CONFIGURAÇÃO DE CARGOS (COM IDS REAIS) ==========
+# ========== CONFIGURAÇÃO DE CARGOS (NOMES REAIS) ==========
 CARGOS_CONFIG = {
-    "👑 Lider 00": 1474880677827579935,
-    "💎 Lider 01": 1474880748803723294,
-    "👮 Lider 02": 1474880750909128874,
-    "🎖️ Lider 03": 1474880752566014156,
-    "🎖️ Gerente Geral": 1474880754214371539,
-    "🎖️ Gerente De Farm": 1474880755078533241,
-    "🎖️ Gerente De Pista": 1474880756026179825,
-    "🎖️ Gerente de Recrutamento": 1474880756433162353,
-    "🎖️ Supervisor": 1474880757385134130,
-    "🎖️ Recrutador": 1474880757984923708,
-    "🎖️ Ceo Elite": 1474881051569688656,
-    "🎖️ Sub Elite": 1474881053108731945,
-    "🎖️ Elite": 1474881054300180631,
-    "👤 Membro": 1474669904547549265,
+    "👑|Lider|00": 1474880677827579935,
+    "💎|Lider|01": 1474880748803723294,
+    "👮|Lider|02": 1474880750909128874,
+    "🎖️|Lider|03": 1474880752566014156,
+    "🎖️| Gerente Geral": 1474880754214371539,
+    "🎖️| Gerente De Farm": 1474880755078533241,
+    "🎖️| Gerente De Pista": 1474880756026179825,
+    "🎖️| Gerente de Recrutamento": 1474880756433162353,
+    "🎖️| Supervisor": 1474880757385134130,
+    "🎖️| Recrutador": 1474880757984923708,
+    "🎖️| Ceo Elite": 1474881051569688656,
+    "🎖️| Sub Elite": 1474881053108731945,
+    "🎖️| Elite": 1474881054300180631,
+    "🙅‍♂️| Membro": 1474669904547549265,
 }
 
 # Mapeamento de prefixos visuais para os cargos
 PREFIXO_PARA_CARGO = {
-    "00": "👑 Lider 00",
-    "01": "💎 Lider 01",
-    "02": "👮 Lider 02",
-    "03": "🎖️ Lider 03",
-    "G.Geral": "🎖️ Gerente Geral",
-    "G.Farm": "🎖️ Gerente De Farm",
-    "G.Pista": "🎖️ Gerente De Pista",
-    "G.Rec": "🎖️ Gerente de Recrutamento",
-    "Sup": "🎖️ Supervisor",
-    "Rec": "🎖️ Recrutador",
-    "Ceo E": "🎖️ Ceo Elite",
-    "Sub E": "🎖️ Sub Elite",
-    "E": "🎖️ Elite",
-    "M": "👤 Membro",
+    "00": "👑 | Lider | 00",
+    "01": "💎 | Lider | 01",
+    "02": "👮 | Lider | 02",
+    "03": "🎖️ | Lider | 03",
+    "G.Geral": "🎖️ | Gerente Geral",
+    "G.Farm": "🎖️ | Gerente De Farm",
+    "G.Pista": "🎖️ | Gerente De Pista",
+    "G.Rec": "🎖️ | Gerente de Recrutamento",
+    "Sup": "🎖️ | Supervisor",
+    "Rec": "🎖️ | Recrutador",
+    "Ceo E": "🎖️ | Ceo Elite",
+    "Sub E": "🎖️ | Sub Elite",
+    "E": "🎖️ | Elite",
+    "M": "🙅‍♂️ | Membro",
 }
 
-# Ordem de prioridade visual
+# Ordem de prioridade visual (do maior para o menor)
 PREFIXOS_VISUAIS = [
     "00", "01", "02", "03", "G.Geral", "G.Farm", "G.Pista", "G.Rec",
     "Sup", "Rec", "Ceo E", "Sub E", "E", "M"
@@ -461,23 +461,12 @@ class CargosCog(commands.Cog):
         # Lista de cargos disponíveis
         cargos_text = ""
         for prefixo in PREFIXOS_VISUAIS:
-            cargos_text += f"• {prefixo}\n"
+            cargos_text += f"• {prefixo} - {PREFIXO_PARA_CARGO[prefixo]}\n"
         
         embed.add_field(
             name="📋 Cargos Disponíveis",
             value=cargos_text,
-            inline=True
-        )
-        
-        # Lista de staff
-        staff_text = ""
-        for prefixo in STAFF_PREFIXOS:
-            staff_text += f"• {prefixo}\n"
-        
-        embed.add_field(
-            name="👑 Staff Permitido",
-            value=staff_text,
-            inline=True
+            inline=False
         )
         
         embed.set_footer(text="Sistema Integrado • Mensagens auto-deletam em 5s")
