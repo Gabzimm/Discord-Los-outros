@@ -11,48 +11,28 @@ CARGO_BASE_ID = 1393998691354018094
 
 # ========== FUNÇÕES AUXILIARES ==========
 def usuario_pode_ver_painel(member: discord.Member) -> bool:
-    """Verifica se o usuário pode ver o painel de controle baseado no cargo"""
+    """Verifica se o usuário tem o cargo base OU qualquer cargo acima dele"""
     if not member:
         return False
     
-    # Staff sempre pode (dono, adm, etc)
+    # Admin sempre pode
     if member.guild_permissions.administrator:
         return True
     
-    # Buscar o gerenciador de cargos
-    cog = member.guild.get_cog("CargosManagerCog")
-    if not cog:
-        print("⚠️ CargosManagerCog não encontrado! Usando método alternativo...")
-        return verificar_por_posicao_direta(member)
-    
-    manager = cog.manager
-    
     # Buscar o cargo base
-    cargo_base = manager.get_cargo_por_id(member.guild.id, CARGO_BASE_ID)
+    cargo_base = member.guild.get_role(CARGO_BASE_ID)
     if not cargo_base:
         print(f"⚠️ Cargo base ID {CARGO_BASE_ID} não encontrado!")
         return False
     
-    # Verificar se o membro tem algum cargo com posição >= cargo_base
+    # Verificar se o membro TEM o cargo base OU algum cargo ACIMA dele
     for role in member.roles:
         if role.position >= cargo_base.position:
             return True
     
     return False
 
-def verificar_por_posicao_direta(member: discord.Member) -> bool:
-    """Método alternativo caso o CargosManager não esteja disponível"""
-    cargo_base = member.guild.get_role(CARGO_BASE_ID)
-    if not cargo_base:
-        return False
-    
-    for role in member.roles:
-        if role.position >= cargo_base.position:
-            return True
-    
-    return False
-
-def get_cargos_acima_base(guild: discord.Guild) -> list:
+def get_cargos_permitidos(guild: discord.Guild) -> list:
     """Retorna lista de cargos com posição >= cargo base"""
     cargo_base = guild.get_role(CARGO_BASE_ID)
     if not cargo_base:
@@ -68,7 +48,7 @@ def get_cargos_acima_base(guild: discord.Guild) -> list:
 # ========== CLASSES PRINCIPAIS ==========
 
 class TicketFinalizadoView(ui.View):
-    """View após ticket fechado - APENAS QUEM PODE VER PAINEL"""
+    """View após ticket fechado - APENAS QUEM TEM O CARGO BASE OU ACIMA"""
     def __init__(self, ticket_owner_id, ticket_channel):
         super().__init__(timeout=None)
         self.ticket_owner_id = ticket_owner_id
@@ -77,7 +57,7 @@ class TicketFinalizadoView(ui.View):
     @ui.button(label="✅ Finalizar Ticket", style=ButtonStyle.green, custom_id="finalizar_ticket")
     async def finalizar_ticket(self, interaction: discord.Interaction, button: ui.Button):
         if not usuario_pode_ver_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas quem pode ver o painel!", ephemeral=True)
+            await interaction.response.send_message("❌ Você não tem permissão para usar este painel!", ephemeral=True)
             return
         
         await interaction.response.defer()
@@ -96,7 +76,7 @@ class TicketFinalizadoView(ui.View):
     @ui.button(label="🔄 Reabrir Ticket", style=ButtonStyle.blurple, custom_id="reabrir_ticket")
     async def reabrir_ticket(self, interaction: discord.Interaction, button: ui.Button):
         if not usuario_pode_ver_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas quem pode ver o painel!", ephemeral=True)
+            await interaction.response.send_message("❌ Você não tem permissão para usar este painel!", ephemeral=True)
             return
         
         await interaction.response.defer()
@@ -135,9 +115,9 @@ class TicketReabertoView(ui.View):
     
     @ui.button(label="🔒 Fechar Ticket", style=ButtonStyle.gray, emoji="🔒", custom_id="close_ticket_reaberto", row=0)
     async def close_ticket_reaberto(self, interaction: discord.Interaction, button: ui.Button):
-        # Dono do ticket pode fechar, ou quem pode ver painel
+        # Dono do ticket pode fechar, ou quem tem cargo base/acima
         if interaction.user.id != self.ticket_owner_id and not usuario_pode_ver_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas quem abriu ou quem pode ver o painel pode fechar!", ephemeral=True)
+            await interaction.response.send_message("❌ Apenas quem abriu ou quem tem cargo pode fechar!", ephemeral=True)
             return
         
         await interaction.response.defer()
@@ -171,12 +151,12 @@ class TicketReabertoView(ui.View):
         )
         
         await self.ticket_channel.send(embed=embed_fechado)
-        await self.ticket_channel.send("**Painel de Controle (apenas quem pode ver):**", view=TicketFinalizadoView(self.ticket_owner_id, self.ticket_channel))
+        await self.ticket_channel.send("**Painel de Controle (apenas quem tem cargo):**", view=TicketFinalizadoView(self.ticket_owner_id, self.ticket_channel))
     
     @ui.button(label="🗑️ Deletar Ticket", style=ButtonStyle.red, emoji="🗑️", custom_id="delete_ticket_reaberto", row=0)
     async def delete_ticket_reaberto(self, interaction: discord.Interaction, button: ui.Button):
         if not usuario_pode_ver_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas quem pode ver o painel pode deletar tickets!", ephemeral=True)
+            await interaction.response.send_message("❌ Apenas quem tem cargo pode deletar tickets!", ephemeral=True)
             return
         
         await interaction.response.defer()
@@ -207,9 +187,9 @@ class TicketStaffView(ui.View):
     
     @ui.button(label="🔒 Fechar Ticket", style=ButtonStyle.gray, emoji="🔒", custom_id="close_ticket_staff", row=0)
     async def close_ticket_staff(self, interaction: discord.Interaction, button: ui.Button):
-        # Dono do ticket pode fechar, ou quem pode ver painel
+        # Dono do ticket pode fechar, ou quem tem cargo base/acima
         if interaction.user.id != self.ticket_owner_id and not usuario_pode_ver_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas quem abriu ou quem pode ver o painel pode fechar!", ephemeral=True)
+            await interaction.response.send_message("❌ Apenas quem abriu ou quem tem cargo pode fechar!", ephemeral=True)
             return
         
         await interaction.response.defer()
@@ -243,12 +223,12 @@ class TicketStaffView(ui.View):
         )
         
         await self.ticket_channel.send(embed=embed_fechado)
-        await self.ticket_channel.send("**Painel de Controle (apenas quem pode ver):**", view=TicketFinalizadoView(self.ticket_owner_id, self.ticket_channel))
+        await self.ticket_channel.send("**Painel de Controle (apenas quem tem cargo):**", view=TicketFinalizadoView(self.ticket_owner_id, self.ticket_channel))
     
     @ui.button(label="🗑️ Deletar Ticket", style=ButtonStyle.red, emoji="🗑️", custom_id="delete_ticket_staff", row=0)
     async def delete_ticket_staff(self, interaction: discord.Interaction, button: ui.Button):
         if not usuario_pode_ver_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas quem pode ver o painel pode deletar tickets!", ephemeral=True)
+            await interaction.response.send_message("❌ Apenas quem tem cargo pode deletar tickets!", ephemeral=True)
             return
         
         await interaction.response.defer()
@@ -352,7 +332,7 @@ class TicketOpenView(ui.View):
             }
             
             # 5. ADICIONAR CARGOS QUE PODEM VER O PAINEL (baseado no ID base)
-            cargos_permitidos = get_cargos_acima_base(interaction.guild)
+            cargos_permitidos = get_cargos_permitidos(interaction.guild)
             for role in cargos_permitidos:
                 overwrites[role] = discord.PermissionOverwrite(
                     read_messages=True,
@@ -451,9 +431,6 @@ class TicketsCog(commands.Cog):
             await ctx.send(f"⚠️ **Cargo base não encontrado!**\nID: `{CARGO_BASE_ID}`\nVerifique se o ID está correto.")
             return
         
-        # Listar cargos que terão acesso
-        cargos_permitidos = get_cargos_acima_base(ctx.guild)
-        
         embed_info = discord.Embed(
             title="🎫 **SISTEMA DE TICKETS**",
             description=(
@@ -514,36 +491,23 @@ class TicketsCog(commands.Cog):
         
         await ctx.send(embed=embed)
     
-    @commands.command(name="testar_acesso")
+    @commands.command(name="listar_cargos")
     @commands.has_permissions(administrator=True)
-    async def testar_acesso(self, ctx):
-        """Testa quais cargos têm acesso ao painel"""
-        cargo_base = ctx.guild.get_role(CARGO_BASE_ID)
-        if not cargo_base:
-            await ctx.send("❌ Cargo base não encontrado!")
-            return
+    async def listar_cargos(self, ctx):
+        """Lista todos os cargos com posição"""
+        cargos = sorted(ctx.guild.roles, key=lambda r: r.position, reverse=True)
         
         embed = discord.Embed(
-            title="🔍 Teste de Acesso ao Painel",
-            description=f"Cargo base: {cargo_base.mention} (posição: {cargo_base.position})",
+            title="📋 Hierarquia de Cargos",
             color=discord.Color.blue()
         )
         
-        # Listar todos os cargos com posição >= base
-        cargos_com_acesso = []
-        for role in ctx.guild.roles:
-            if role.position >= cargo_base.position and role.name != "@everyone":
-                cargos_com_acesso.append(f"{role.mention} - pos: {role.position}")
+        texto = ""
+        for role in cargos[:20]:  # Mostrar apenas top 20
+            if role.name != "@everyone":
+                texto += f"{role.mention} - pos: {role.position}\n"
         
-        if cargos_com_acesso:
-            embed.add_field(
-                name="✅ Cargos com acesso",
-                value="\n".join(cargos_com_acesso[:15]),
-                inline=False
-            )
-        else:
-            embed.add_field(name="❌ Nenhum cargo", value="Nenhum cargo além do base encontrado!", inline=False)
-        
+        embed.description = texto
         await ctx.send(embed=embed)
 
 async def setup(bot):
