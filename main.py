@@ -10,7 +10,6 @@ import socket
 
 # ==================== VERIFICAÇÃO DE INSTÂNCIA ÚNICA ====================
 def verificar_instancia_unica():
-    """Garante que apenas uma instância do bot rode"""
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.bind('\0bot_jugadores_unico')
