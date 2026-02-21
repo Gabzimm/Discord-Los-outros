@@ -146,6 +146,12 @@ async def custom_help(ctx, *, comando: str = None):
         value="`!setup_painel` `!rec_stats` `!rec_reset`",
         inline=False
     )
+     embed.add_field(
+        name="🏆 **PRÊMIOS**",
+        value=( "`!premio @user [rec/farm/pista]` `!premio @user` `!premios`",
+        inline=False
+         
+    )
     
     # Comandos de Cargos
     embed.add_field(
@@ -211,6 +217,7 @@ async def load_cogs():
         'modules.config_cargos',
         'modules.painel_rec',
         'modules.cargos',
+        'modules.premios',
     ]
     
     carregados = 0
