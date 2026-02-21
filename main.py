@@ -146,6 +146,7 @@ async def custom_help(ctx, *, comando: str = None):
         value="`!setup_painel` `!rec_stats` `!rec_reset`",
         inline=False
     )
+    #comandos de Premiacao
      embed.add_field(
         name="🏆 **PRÊMIOS**",
         value=( "`!premio @user [rec/farm/pista]` `!premio @user` `!premios`",
