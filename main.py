@@ -7,6 +7,7 @@ import asyncio
 import aiohttp
 from aiohttp import web
 import socket
+import time
 
 # ==================== VERIFICAÇÃO DE INSTÂNCIA ÚNICA ====================
 def verificar_instancia_unica():
@@ -22,6 +23,10 @@ def verificar_instancia_unica():
 
 if not verificar_instancia_unica():
     sys.exit(1)
+
+# ==================== CONTROLE DE REINICIALIZAÇÃO ====================
+ULTIMA_REINICIALIZACAO = time.time()
+MIN_INTERVALO_REINICIALIZACAO = 60  # 60 segundos mínimo entre reinicializações
 
 # ==================== KEEP-ALIVE ====================
 class KeepAliveServer:
@@ -86,7 +91,7 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
-            name="Jugadores | !help"
+            name="Tire duvidas | !help"
         )
     )
     
@@ -169,6 +174,12 @@ async def status(ctx):
     if cogs:
         embed.add_field(name="📦 Módulos Ativos", value="\n".join(cogs), inline=False)
     
+    # Mostrar tempo de atividade
+    uptime = time.time() - ULTIMA_REINICIALIZACAO
+    horas = int(uptime // 3600)
+    minutos = int((uptime % 3600) // 60)
+    embed.add_field(name="⏱️ Tempo de Atividade", value=f"{horas}h {minutos}m", inline=False)
+    
     await ctx.send(embed=embed)
 
 @bot.command(name="reload")
@@ -180,6 +191,16 @@ async def reload_cogs(ctx):
 
 # ==================== CARREGAR MÓDULOS ====================
 async def load_cogs():
+    global ULTIMA_REINICIALIZACAO
+    
+    # Verificar se passou tempo suficiente desde a última reinicialização
+    agora = time.time()
+    if agora - ULTIMA_REINICIALIZACAO < MIN_INTERVALO_REINICIALIZACAO:
+        print(f"⚠️ Ignorando recarga rápida ({(agora - ULTIMA_REINICIALIZACAO):.1f}s)")
+        return True
+    
+    ULTIMA_REINICIALIZACAO = agora
+    
     print("=" * 50)
     print("🔄 CARREGANDO MÓDULOS...")
     
@@ -193,11 +214,15 @@ async def load_cogs():
     for cog in cogs:
         print(f"\n🔍 Tentando: {cog}")
         try:
+            # Descarregar se já estiver carregado
+            try:
+                await bot.unload_extension(cog)
+                print(f"⏪ '{cog}' descarregado")
+            except:
+                pass
+            
             await bot.load_extension(cog)
             print(f"✅ '{cog}' carregado!")
-            carregados += 1
-        except commands.ExtensionAlreadyLoaded:
-            print(f"⚠️ '{cog}' já estava carregado")
             carregados += 1
         except Exception as e:
             print(f"❌ Erro: {type(e).__name__}: {e}")
