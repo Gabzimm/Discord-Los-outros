@@ -221,15 +221,7 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
             
             # SE NÃO ENCONTRAR O RECRUTADOR, DAR ERRO
             if not recrutador_member:
-                await interaction.followup.send(
-                    f"❌ **RECRUTADOR NÃO ENCONTRADO!**\n\n"
-                    f"Não existe nenhum membro com o ID FiveM `{self.recrutador.value}` no servidor.\n\n"
-                    f"**Verifique:**\n"
-                    f"• O ID digitado está correto?\n"
-                    f"• A pessoa já fez o set e está com o nickname no formato `M | Nome | ID`?\n"
-                    f"• Peça ajuda para um staff se necessário.",
-                    ephemeral=True
-                )
+                await interaction.followup.send(f"❌ Não existe um recrutador com o ID `{self.recrutador.value}` no servidor!", ephemeral=True)
                 return
             
             # Se encontrou, processa normalmente
@@ -248,7 +240,9 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 f"**📅 Data:** {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
             )
             
-            descricao += f"\n**🤝 Recrutado por:** {recrutador_nome} ({recrutador_member.mention})"
+            descricao += f"\n**🤝 Recrutado por:** {recrutador_nome}"
+            if recrutador_member:
+                descricao += f" ({recrutador_member.mention})"
             
             descricao += "\n\n**⏳ Status:** Aguardando aprovação"
             
@@ -370,7 +364,7 @@ class SetsCog(commands.Cog, name="Sets"):
         embed = discord.Embed(
             title="🎮 **PEÇA SEU SET AQUI!**",
             description=(
-                 "Clique no botão abaixo e preencha os dados:\n\n"
+                "Clique no botão abaixo e preencha os dados:\n\n"
                 "aprovamento para receber seu set\n"
                 "personalizado no servidor.\n\n"
                 "**📌 Instruções:**\n"
