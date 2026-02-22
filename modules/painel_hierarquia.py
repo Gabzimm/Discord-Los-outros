@@ -11,23 +11,22 @@ import re
 # Arquivo para salvar o painel
 ARQUIVO_PAINEIS = "paineis_hierarquia.json"
 
-# Mapeamento de nomes de cargos REAIS para exibição
-# Use os nomes EXATOS dos cargos no seu servidor
+# Mapeamento de nomes de cargos REAIS para exibição (em ORDEM DECRESCENTE - do maior para o menor)
 CARGOS_REAIS = [
-    {"nome": "👑 | Lider | 00", "display": "00", "emoji": "👑"},
-    {"nome": "💎 | Lider | 01", "display": "01", "emoji": "💎"},
-    {"nome": "👮 | Lider | 02", "display": "02", "emoji": "👮"},
-    {"nome": "🎖️ | Lider | 03", "display": "03", "emoji": "🎖️"},
-    {"nome": "🎖️ | Gerente Geral", "display": "G.Geral", "emoji": "📊"},
-    {"nome": "🎖️ | Gerente De Farm", "display": "G.Farm", "emoji": "🌾"},
-    {"nome": "🎖️ | Gerente De Pista", "display": "G.Pista", "emoji": "🏁"},
-    {"nome": "🎖️ | Gerente de Recrutamento", "display": "G.Rec", "emoji": "🤝"},
-    {"nome": "🎖️ | Supervisor", "display": "Sup", "emoji": "👁️"},
-    {"nome": "🎖️ | Recrutador", "display": "Rec", "emoji": "🔍"},
-    {"nome": "🎖️ | Ceo Elite", "display": "Ceo E", "emoji": "👑"},
-    {"nome": "🎖️ | Sub Elite", "display": "Sub E", "emoji": "⭐"},
-    {"nome": "🎖️ | Elite", "display": "E", "emoji": "✨"},
-    {"nome": "🙅‍♂️ | Membro", "display": "M", "emoji": "👤"},
+    {"nome": "👑 | Lider | 00", "display": "00", "emoji": "👑", "prioridade": 1},
+    {"nome": "💎 | Lider | 01", "display": "01", "emoji": "💎", "prioridade": 2},
+    {"nome": "👮 | Lider | 02", "display": "02", "emoji": "👮", "prioridade": 3},
+    {"nome": "🎖️ | Lider | 03", "display": "03", "emoji": "🎖️", "prioridade": 4},
+    {"nome": "🎖️ | Gerente Geral", "display": "G.Geral", "emoji": "📊", "prioridade": 5},
+    {"nome": "🎖️ | Gerente De Farm", "display": "G.Farm", "emoji": "🌾", "prioridade": 6},
+    {"nome": "🎖️ | Gerente De Pista", "display": "G.Pista", "emoji": "🏁", "prioridade": 7},
+    {"nome": "🎖️ | Gerente de Recrutamento", "display": "G.Rec", "emoji": "🤝", "prioridade": 8},
+    {"nome": "🎖️ | Supervisor", "display": "Sup", "emoji": "👁️", "prioridade": 9},
+    {"nome": "🎖️ | Recrutador", "display": "Rec", "emoji": "🔍", "prioridade": 10},
+    {"nome": "🎖️ | Ceo Elite", "display": "Ceo E", "emoji": "👑", "prioridade": 11},
+    {"nome": "🎖️ | Sub Elite", "display": "Sub E", "emoji": "⭐", "prioridade": 12},
+    {"nome": "🎖️ | Elite", "display": "E", "emoji": "✨", "prioridade": 13},
+    {"nome": "🙅‍♂️ | Membro", "display": "M", "emoji": "👤", "prioridade": 14},
 ]
 
 def normalizar_nome(nome: str) -> str:
@@ -47,6 +46,30 @@ def extrair_nome_limpo(nickname: str) -> str:
         return partes[1].strip()
     
     return nickname
+
+def encontrar_cargo_mais_alto(member, cargos_config):
+    """Encontra o CARGO MAIS ALTO do membro baseado na prioridade"""
+    cargos_membro = []
+    
+    for role in member.roles:
+        for cargo_info in cargos_config:
+            if normalizar_nome(role.name) == normalizar_nome(cargo_info["nome"]):
+                cargos_membro.append({
+                    "nome": cargo_info["nome"],
+                    "display": cargo_info["display"],
+                    "emoji": cargo_info["emoji"],
+                    "prioridade": cargo_info["prioridade"]
+                })
+                break
+    
+    if not cargos_membro:
+        return None
+    
+    # Ordenar por prioridade (menor número = mais alto)
+    cargos_membro.sort(key=lambda x: x["prioridade"])
+    
+    # Retornar o cargo mais alto (menor prioridade)
+    return cargos_membro[0]
 
 # ========== VIEW DO PAINEL ==========
 class PainelHierarquiaView(ui.View):
@@ -79,35 +102,26 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
         """Cria o embed com a hierarquia completa do servidor"""
         
         # Dicionário para armazenar membros por cargo
-        membros_por_cargo = {}
-        
-        # Inicializar listas vazias para cada cargo
-        for cargo_info in CARGOS_REAIS:
-            membros_por_cargo[cargo_info["nome"]] = []
+        membros_por_cargo = {cargo["display"]: [] for cargo in CARGOS_REAIS}
         
         # Percorrer todos os membros do servidor
         for member in guild.members:
             if member.bot:
                 continue  # Ignorar bots
             
-            # Verificar os cargos do membro
-            cargo_encontrado = None
-            for role in member.roles:
-                for cargo_info in CARGOS_REAIS:
-                    if normalizar_nome(role.name) == normalizar_nome(cargo_info["nome"]):
-                        cargo_encontrado = cargo_info["nome"]
-                        break
-                if cargo_encontrado:
-                    break
+            # Encontrar o CARGO MAIS ALTO do membro
+            cargo_mais_alto = encontrar_cargo_mais_alto(member, CARGOS_REAIS)
             
-            if cargo_encontrado:
+            if cargo_mais_alto:
+                display = cargo_mais_alto["display"]
+                
                 # Extrair nome limpo (sem prefixo e ID)
                 nome_limpo = extrair_nome_limpo(member.nick or member.name)
                 if not nome_limpo:
                     nome_limpo = member.name.split('#')[0]
                 
-                # Adicionar à lista
-                membros_por_cargo[cargo_encontrado].append({
+                # Adicionar à lista do cargo correto
+                membros_por_cargo[display].append({
                     "nome": nome_limpo,
                     "mention": member.mention,
                     "nick_completo": member.nick or member.name
@@ -122,12 +136,11 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
         
         total_membros = 0
         
-        # Adicionar campos para cada cargo (do maior para o menor)
-        for cargo_info in CARGOS_REAIS:
-            cargo_nome = cargo_info["nome"]
+        # Adicionar campos para cada cargo (em ordem de prioridade)
+        for cargo_info in sorted(CARGOS_REAIS, key=lambda x: x["prioridade"]):
             display = cargo_info["display"]
             emoji = cargo_info["emoji"]
-            membros = membros_por_cargo.get(cargo_nome, [])
+            membros = membros_por_cargo.get(display, [])
             quantidade = len(membros)
             total_membros += quantidade
             
