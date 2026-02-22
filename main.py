@@ -222,10 +222,10 @@ async def load_cogs():
     cogs = [
         'modules.sets',
         'modules.tickets',
-        'modules.painel_rec',
-        'modules.cargos',
-        'modules.premios',
-        'modules.limpeza',
+        'modules.config_cargos',
+        'modules.cargos',  # Seu sistema de cargos
+        'modules.painel_rec',  # ← ADICIONE ESTA LINHA
+        'modules.limpeza',  # Se tiver o sistema de limpeza
     ]
     
     carregados = 0
