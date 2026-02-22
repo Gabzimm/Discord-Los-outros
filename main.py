@@ -233,7 +233,8 @@ async def load_cogs():
         'modules.cargos',  # Seu sistema de cargos
         'modules.painel_rec',  # ← ADICIONE ESTA LINHA
         'modules.limpeza',  # Se tiver o sistema de limpeza
-        'modules.painel_hierarquia', 
+        'modules.painel_hierarquia',
+        'modules.premios',
     ]
     
     carregados = 0
