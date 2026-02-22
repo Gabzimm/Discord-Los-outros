@@ -66,11 +66,12 @@ def usuario_pode_usar_premio(member: discord.Member) -> bool:
 # ========== CLASSES ==========
 class PremioConfirmView(ui.View):
     """View de confirmação antes de enviar o prêmio"""
-    def __init__(self, target_member, premio_tipo, staff_member):
+    def __init__(self, target_member, premio_tipo, staff_member, mensagem_original):
         super().__init__(timeout=60)
         self.target_member = target_member
         self.premio_tipo = premio_tipo
         self.staff_member = staff_member
+        self.mensagem_original = mensagem_original
         self.preset = PRESETS[premio_tipo]
     
     @ui.button(label="✅ Confirmar Envio", style=ButtonStyle.green, custom_id="confirmar_premio")
@@ -127,14 +128,14 @@ class PremioConfirmView(ui.View):
             except:
                 pass
             
-            # Mensagem de confirmação
-            confirm_msg = await interaction.followup.send("✅ Prêmio enviado com sucesso!", ephemeral=True)
-            await asyncio.sleep(3)
-            await confirm_msg.delete()
+            # Apagar mensagem de confirmação
+            await self.mensagem_original.delete()
             
-            # Desabilitar botões
-            self.clear_items()
-            await interaction.message.edit(view=self)
+            # Apagar mensagem do comando também
+            try:
+                await self.staff_member.last_message.delete()
+            except:
+                pass
             
         except Exception as e:
             await interaction.followup.send(f"❌ Erro ao enviar prêmio: {e}", ephemeral=True)
@@ -147,15 +148,21 @@ class PremioConfirmView(ui.View):
         
         await interaction.response.defer()
         
-        self.clear_items()
-        await interaction.message.edit(content="❌ Envio de prêmio cancelado.", view=self)
-        await interaction.followup.send("✅ Cancelado!", ephemeral=True)
+        # Apagar mensagem de confirmação
+        await self.mensagem_original.delete()
+        
+        # Apagar mensagem do comando também
+        try:
+            await self.staff_member.last_message.delete()
+        except:
+            pass
 
 class PremioSelect(ui.Select):
     """Select menu para escolher o tipo de prêmio"""
-    def __init__(self, target_member, staff_member):
+    def __init__(self, target_member, staff_member, mensagem_original):
         self.target_member = target_member
         self.staff_member = staff_member
+        self.mensagem_original = mensagem_original
         
         options = [
             discord.SelectOption(
@@ -205,17 +212,18 @@ class PremioSelect(ui.Select):
             color=preset["cor"]
         )
         
-        view = PremioConfirmView(self.target_member, premio_tipo, self.staff_member)
+        view = PremioConfirmView(self.target_member, premio_tipo, self.staff_member, self.mensagem_original)
         
         await interaction.response.edit_message(embed=embed, view=view)
 
 class PremioSelectView(ui.View):
     """View para selecionar o tipo de prêmio"""
-    def __init__(self, target_member, staff_member):
+    def __init__(self, target_member, staff_member, mensagem_original):
         super().__init__(timeout=60)
         self.target_member = target_member
         self.staff_member = staff_member
-        self.add_item(PremioSelect(target_member, staff_member))
+        self.mensagem_original = mensagem_original
+        self.add_item(PremioSelect(target_member, staff_member, mensagem_original))
 
 # ========== COG PRINCIPAL ==========
 class PremiosCog(commands.Cog, name="Prêmios"):
@@ -248,7 +256,10 @@ class PremiosCog(commands.Cog, name="Prêmios"):
                 description="Use: `!premio @usuario [rec/farm/pista]`",
                 color=discord.Color.red()
             )
-            await ctx.send(embed=embed_erro, delete_after=5)
+            msg_erro = await ctx.send(embed=embed_erro)
+            await asyncio.sleep(5)
+            await msg_erro.delete()
+            await ctx.message.delete()
             return
         
         # Se não especificou o tipo, mostrar menu de seleção
@@ -259,8 +270,7 @@ class PremiosCog(commands.Cog, name="Prêmios"):
                 color=discord.Color.blue()
             )
             
-            view = PremioSelectView(member, ctx.author)
-            await ctx.send(embed=embed, view=view)
+            msg = await ctx.send(embed=embed, view=PremioSelectView(member, ctx.author, ctx.message))
             return
         
         # Se especificou o tipo, ir direto para confirmação
@@ -282,9 +292,8 @@ class PremiosCog(commands.Cog, name="Prêmios"):
             color=preset["cor"]
         )
         
-        view = PremioConfirmView(member, tipo, ctx.author)
+        view = PremioConfirmView(member, tipo, ctx.author, ctx.message)
         await ctx.send(embed=embed, view=view)
-        await ctx.message.delete()
     
     @commands.command(name="premios", aliases=["listpremios"])
     async def listar_premios(self, ctx):
@@ -306,12 +315,16 @@ class PremiosCog(commands.Cog, name="Prêmios"):
         embed.set_footer(text="Apenas staff pode usar o comando !premio")
         
         await ctx.send(embed=embed)
+        await ctx.message.delete()
     
     @commands.command(name="addpremio")
     @commands.has_permissions(administrator=True)
     async def adicionar_premio(self, ctx):
         """[ADMIN] Adiciona um novo tipo de prêmio (em desenvolvimento)"""
-        await ctx.send("⚙️ Sistema de adição de prêmios em desenvolvimento!")
+        msg = await ctx.send("⚙️ Sistema de adição de prêmios em desenvolvimento!")
+        await asyncio.sleep(5)
+        await msg.delete()
+        await ctx.message.delete()
 
 # ========== SETUP ==========
 async def setup(bot):
