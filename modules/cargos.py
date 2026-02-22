@@ -182,7 +182,7 @@ class CargoSelectView(ui.View):
         
         # Opções de cargo
         options = []
-        for cargo_nome in ORDEM_PRIORIDADE:
+        for i, cargo_nome in enumerate(ORDEM_PRIORIDADE):
             # Extrair prefixo para mostrar
             if " | " in cargo_nome:
                 partes = cargo_nome.split(' | ')
@@ -193,7 +193,8 @@ class CargoSelectView(ui.View):
             options.append(
                 discord.SelectOption(
                     label=prefixo,
-                    description=cargo_nome
+                    description=cargo_nome,
+                    value=str(i)  # ← USAR ÍNDICE COMO VALUE ÚNICO
                 )
             )
         
@@ -208,9 +209,11 @@ class CargoSelectView(ui.View):
     async def on_select(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
-        cargo_nome = self.select.values[0]
+        # Pegar o índice e converter para o nome do cargo
+        index = int(self.select.values[0])
+        cargo_nome = ORDEM_PRIORIDADE[index]
         
-        # Usar busca flexível em vez de discord.utils.get
+        # Usar busca flexível
         cargo = get_cargo_por_nome_flexivel(interaction.guild, cargo_nome)
         
         if not cargo:
