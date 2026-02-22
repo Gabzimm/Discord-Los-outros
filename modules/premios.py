@@ -151,15 +151,8 @@ class PremioConfirmView(ui.View):
         await interaction.message.edit(content="❌ Envio de prêmio cancelado.", view=self)
         await interaction.followup.send("✅ Cancelado!", ephemeral=True)
 
-class PremioSelectView(ui.View):
-    """View para selecionar o tipo de prêmio"""
-    def __init__(self, target_member, staff_member):
-        super().__init__(timeout=60)
-        self.target_member = target_member
-        self.staff_member = staff_member
-        self.add_item(PremioSelect(target_member, staff_member))
-
 class PremioSelect(ui.Select):
+    """Select menu para escolher o tipo de prêmio"""
     def __init__(self, target_member, staff_member):
         self.target_member = target_member
         self.staff_member = staff_member
@@ -215,6 +208,14 @@ class PremioSelect(ui.Select):
         view = PremioConfirmView(self.target_member, premio_tipo, self.staff_member)
         
         await interaction.response.edit_message(embed=embed, view=view)
+
+class PremioSelectView(ui.View):
+    """View para selecionar o tipo de prêmio"""
+    def __init__(self, target_member, staff_member):
+        super().__init__(timeout=60)
+        self.target_member = target_member
+        self.staff_member = staff_member
+        self.add_item(PremioSelect(target_member, staff_member))
 
 # ========== COG PRINCIPAL ==========
 class PremiosCog(commands.Cog, name="Prêmios"):
