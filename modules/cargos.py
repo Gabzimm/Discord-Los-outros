@@ -5,28 +5,27 @@ import asyncio
 from datetime import datetime
 import re
 
-# ========== CONFIGURAÇÃO DE CARGOS (NOMES REAIS) ==========
-CARGOS_CONFIG = {
-    "👑 | Lider | 00": 1474880677827579935,
-    "💎 | Lider | 01": 1474880748803723294,
-    "👮 | Lider | 02": 1474880750909128874,
-    "🎖️ | Lider | 03": 1474880752566014156,
-    "🎖️ | Gerente Geral": 1474880754214371539,
-    "🎖️ | Gerente De Farm": 1474880755078533241,
-    "🎖️ | Gerente De Pista": 1474880756026179825,
-    "🎖️ | Gerente de Recrutamento": 1474880756433162353,
-    "🎖️ | Supervisor": 1474880757385134130,
-    "🎖️ | Recrutador": 1474880757984923708,
-    "🎖️ | Ceo Elite": 1474881051569688656,
-    "🎖️ | Sub Elite": 1474881053108731945,
-    "🎖️ | Elite": 1474881054300180631,
-    "🙅‍♂️ | Membro": 1474669904547549265,
+# ========== CONFIGURAÇÃO SIMPLES (IGUAL AO BASE) ==========
+NICKNAME_CONFIG = {
+    "👑 | Lider | 00": "00 | {name} | {id}",
+    "💎 | Lider | 01": "01 | {name} | {id}",
+    "👮 | Lider | 02": "02 | {name} | {id}",
+    "🎖️ | Lider | 03": "03 | {name} | {id}",
+    "🎖️ | Gerente Geral": "G.Geral | {name} | {id}",
+    "🎖️ | Gerente De Farm": "G.Farm | {name} | {id}",
+    "🎖️ | Gerente De Pista": "G.Pista | {name} | {id}",
+    "🎖️ | Gerente de Recrutamento": "G.Rec | {name} | {id}",
+    "🎖️ | Supervisor": "Sup | {name} | {id}",
+    "🎖️ | Recrutador": "Rec | {name} | {id}",
+    "🎖️ | Ceo Elite": "Ceo E | {name} | {id}",
+    "🎖️ | Sub Elite": "Sub E | {name} | {id}",
+    "🎖️ | Elite": "E | {name} | {id}",
+    "🙅‍♂️ | Membro": "M | {name} | {id}",
 }
 
-# ORDEM DE PRIORIDADE (usando os NOMES REAIS dos cargos)
 ORDEM_PRIORIDADE = [
     "👑 | Lider | 00",
-    "💎 | Lider | 01", 
+    "💎 | Lider | 01",
     "👮 | Lider | 02",
     "🎖️ | Lider | 03",
     "🎖️ | Gerente Geral",
@@ -41,7 +40,7 @@ ORDEM_PRIORIDADE = [
     "🙅‍♂️ | Membro",
 ]
 
-# Cargos de staff (usando os NOMES REAIS)
+# Cargos de staff (quem pode usar o painel)
 STAFF_ROLES = [
     "👑 | Lider | 00",
     "💎 | Lider | 01",
@@ -57,48 +56,12 @@ STAFF_ROLES = [
     "🎖️ | Sub Elite",
 ]
 
-# Mapeamento de nomes de cargos para prefixos visuais
-CARGO_PARA_PREFIXO = {
-    "👑 | Lider | 00": "00",
-    "💎 | Lider | 01": "01",
-    "👮 | Lider | 02": "02",
-    "🎖️ | Lider | 03": "03",
-    "🎖️ | Gerente Geral": "G.Geral",
-    "🎖️ | Gerente De Farm": "G.Farm",
-    "🎖️ | Gerente De Pista": "G.Pista",
-    "🎖️ | Gerente de Recrutamento": "G.Rec",
-    "🎖️ | Supervisor": "Sup",
-    "🎖️ | Recrutador": "Rec",
-    "🎖️ | Ceo Elite": "Ceo E",
-    "🎖️ | Sub Elite": "Sub E",
-    "🎖️ | Elite": "E",
-    "🙅‍♂️ | Membro": "M",
-}
-
-# ========== CONFIGURAÇÃO DE NICKNAMES ==========
-NICKNAME_CONFIG = {
-    "00": "00 | {name} | {id}",
-    "01": "01 | {name} | {id}",
-    "02": "02 | {name} | {id}",
-    "03": "03 | {name} | {id}",
-    "G.Geral": "G.Geral | {name} | {id}",
-    "G.Farm": "G.Farm | {name} | {id}",
-    "G.Pista": "G.Pista | {name} | {id}",
-    "G.Rec": "G.Rec | {name} | {id}",
-    "Sup": "Sup | {name} | {id}",
-    "Rec": "Rec | {name} | {id}",
-    "Ceo E": "Ceo E | {name} | {id}",
-    "Sub E": "Sub E | {name} | {id}",
-    "E": "E | {name} | {id}",
-    "M": "M | {name} | {id}",
-}
-
-# ========== FUNÇÕES AUXILIARES ==========
+# ========== FUNÇÕES AUXILIARES (IGUAL AO BASE) ==========
 def buscar_usuario_por_fivem_id(guild: discord.Guild, fivem_id: str) -> discord.Member:
     """Busca usuário pelo ID do FiveM no nickname"""
     for member in guild.members:
         if member.nick:
-            # Procurar ID no formato " | 123456" no final
+            # Padrão: " | 123456" no final
             if member.nick.endswith(f" | {fivem_id}"):
                 return member
     
@@ -109,7 +72,7 @@ def extrair_parte_nickname(nickname: str):
     if not nickname:
         return "User"
     
-    # Formato: "PREFIXO | NOME | ID"
+    # Padrão: "PREFIXO | NOME | ID"
     partes = nickname.split(' | ')
     if len(partes) >= 2:
         return partes[1].strip()
@@ -121,7 +84,7 @@ def extrair_id_fivem(nickname: str):
     if not nickname:
         return None
     
-    # Formato: "PREFIXO | NOME | ID"
+    # Padrão: "PREFIXO | NOME | ID"
     partes = nickname.split(' | ')
     if len(partes) >= 3:
         ultima_parte = partes[-1].strip()
@@ -130,19 +93,8 @@ def extrair_id_fivem(nickname: str):
     
     return None
 
-def extrair_prefixo_visual(nickname: str):
-    """Extrai o prefixo visual do nickname (primeira parte antes do primeiro ' | ')"""
-    if not nickname:
-        return None
-    
-    partes = nickname.split(' | ')
-    if partes:
-        return partes[0].strip()
-    
-    return None
-
 async def atualizar_nickname(member: discord.Member):
-    """Atualiza nickname baseado no cargo principal"""
+    """Atualiza nickname mantendo a estrutura igual ao BASE"""
     try:
         # Verificar permissões
         if not member.guild.me.guild_permissions.manage_nicknames:
@@ -157,37 +109,23 @@ async def atualizar_nickname(member: discord.Member):
         if not id_fivem:
             id_fivem = "000000"
         
-        # Se o nome estiver vazio, usar o nome do usuário
-        if not parte_nome or parte_nome == "User":
-            parte_nome = member.name.split('#')[0]
-        
-        # Encontrar o cargo principal (igual ao script base)
+        # Encontrar cargo principal (igual ao base)
         cargo_principal = None
         for cargo_nome in ORDEM_PRIORIDADE:
             if discord.utils.get(member.roles, name=cargo_nome):
                 cargo_principal = cargo_nome
                 break
         
-        if not cargo_principal:
+        if not cargo_principal or cargo_principal not in NICKNAME_CONFIG:
             return False
         
-        # Converter nome do cargo para prefixo visual
-        prefixo_visual = CARGO_PARA_PREFIXO.get(cargo_principal, "M")
-        
         # Gerar novo nickname
-        template = NICKNAME_CONFIG.get(prefixo_visual, NICKNAME_CONFIG["M"])
+        template = NICKNAME_CONFIG[cargo_principal]
         novo_nick = template.format(name=parte_nome, id=id_fivem)
         
         # Limitar a 32 caracteres
         if len(novo_nick) > 32:
-            # Encurtar o nome
-            nome_curto = parte_nome[:15]
-            novo_nick = template.format(name=nome_curto, id=id_fivem)
-            
-            if len(novo_nick) > 32:
-                # Último caso: remover espaços
-                novo_nick = novo_nick.replace(' ', '')
-                novo_nick = novo_nick[:32]
+            novo_nick = novo_nick[:32]
         
         # Aplicar se for diferente
         if member.nick != novo_nick:
@@ -195,39 +133,23 @@ async def atualizar_nickname(member: discord.Member):
             return True
             
     except Exception as e:
-        print(f"Erro ao atualizar nickname: {e}")
+        print(f"Erro: {e}")
     
     return False
 
-def usuario_pode_usar_painel(member: discord.Member) -> bool:
-    """Verifica se o usuário pode usar o painel de cargos"""
-    if not member:
-        return False
-    
-    # Admin sempre pode
-    if member.guild_permissions.administrator:
-        return True
-    
-    # Verificar se tem cargo staff (igual ao script base)
-    for role in member.roles:
-        if role.name in STAFF_ROLES:
-            return True
-    
-    return False
-
-# ========== SISTEMA DE SELEÇÃO DE CARGO ==========
+# ========== SISTEMA DE SELEÇÃO DE CARGO (IGUAL AO BASE) ==========
 class CargoSelectView(ui.View):
-    """View para selecionar cargo"""
+    """View simples para selecionar cargo"""
     def __init__(self, member: discord.Member, action: str):
         super().__init__(timeout=60)
         self.member = member
         self.action = action  # "add" ou "remove"
         
-        # Opções de cargo (usando os nomes reais)
+        # Opções de cargo
         options = []
         for cargo_nome in ORDEM_PRIORIDADE:
-            # Pegar apenas o prefixo para mostrar (mais limpo)
-            prefixo = CARGO_PARA_PREFIXO.get(cargo_nome, "?")
+            # Extrair prefixo para mostrar (opcional)
+            prefixo = cargo_nome.split(' | ')[0] if ' | ' in cargo_nome else cargo_nome
             options.append(
                 discord.SelectOption(
                     label=prefixo,
@@ -246,25 +168,11 @@ class CargoSelectView(ui.View):
     async def on_select(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
-        prefixo = self.select.values[0]
-        
-        # Encontrar o nome real do cargo baseado no prefixo
-        cargo_nome = None
-        for nome, pref in CARGO_PARA_PREFIXO.items():
-            if pref == prefixo:
-                cargo_nome = nome
-                break
-        
-        if not cargo_nome:
-            msg = await interaction.followup.send("❌ Cargo não encontrado!", ephemeral=True)
-            await asyncio.sleep(5)
-            await msg.delete()
-            return
-        
+        cargo_nome = self.select.values[0]
         cargo = discord.utils.get(interaction.guild.roles, name=cargo_nome)
         
         if not cargo:
-            msg = await interaction.followup.send("❌ Cargo não encontrado no servidor!", ephemeral=True)
+            msg = await interaction.followup.send("❌ Cargo não encontrado!", ephemeral=True)
             await asyncio.sleep(5)
             await msg.delete()
             return
@@ -297,12 +205,12 @@ class CargoSelectView(ui.View):
             await asyncio.sleep(5)
             await msg.delete()
 
-# ========== MODAL DE BUSCA ==========
-class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
-    """Modal para buscar usuário"""
+# ========== MODAL DE BUSCA (IGUAL AO BASE) ==========
+class SimpleCargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
+    """Modal simples para gerenciar cargo"""
     
     usuario_input = ui.TextInput(
-        label="Usuário (@nome ou ID do FiveM):",
+        label="Usuário (@nome ou número do FiveM):",
         placeholder="Ex: @João ou 9237",
         required=True
     )
@@ -314,8 +222,8 @@ class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
-        # Verificar se pode usar o painel
-        if not usuario_pode_usar_painel(interaction.user):
+        # Verificar se é staff
+        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
             msg = await interaction.followup.send("❌ Apenas staff pode usar!", ephemeral=True)
             await asyncio.sleep(5)
             await msg.delete()
@@ -333,7 +241,7 @@ class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
             
             # 2. Se for apenas números (ID do FiveM)
             elif input_text.isdigit():
-                # Buscar pelo ID do FiveM nos nicknames
+                # Primeiro, buscar pelo ID do FiveM no nickname
                 member = buscar_usuario_por_fivem_id(interaction.guild, input_text)
                 
                 # Se não encontrou, buscar pelo ID do Discord
@@ -345,7 +253,7 @@ class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
             
             # 3. Se for texto (nome)
             else:
-                # Buscar por nome no nickname
+                # Buscar por nome no nickname primeiro
                 for guild_member in interaction.guild.members:
                     if guild_member.nick and input_text.lower() in guild_member.nick.lower():
                         member = guild_member
@@ -377,24 +285,23 @@ class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
                 await msg.delete()
                 return
             
-            # Extrair informações do nickname
+            # Extrair ID do FiveM do nickname
             id_fivem = extrair_id_fivem(member.nick or member.name)
-            prefixo_atual = extrair_prefixo_visual(member.nick or member.name)
             
-            # Mostrar view para selecionar cargo
-            view = CargoSelectView(member, self.action)
-            
+            # Criar embed simples
             embed = discord.Embed(
                 title=f"{'➕ Adicionar' if self.action == 'add' else '➖ Remover'} Cargo",
                 description=(
                     f"**Usuário:** {member.mention}\n"
                     f"**Nickname atual:** `{member.nick or member.name}`\n"
-                    f"**Prefixo atual:** `{prefixo_atual or 'Nenhum'}`\n"
                     f"**ID FiveM:** `{id_fivem or 'Não encontrado'}`\n\n"
                     f"Selecione o cargo abaixo:"
                 ),
-                color=discord.Color.green() if self.action == "add" else discord.Color.red()
+                color=discord.Color.blue() if self.action == "add" else discord.Color.red()
             )
+            
+            # Mostrar view para selecionar cargo
+            view = CargoSelectView(member, self.action)
             
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
             
@@ -408,34 +315,37 @@ class CargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
             await asyncio.sleep(5)
             await msg.delete()
 
-# ========== VIEW DO PAINEL PRINCIPAL ==========
+# ========== VIEW DO PAINEL (IGUAL AO BASE) ==========
 class CleanCargoView(ui.View):
-    """View do painel de cargos"""
+    """View clean do painel de cargos"""
     def __init__(self):
         super().__init__(timeout=None)
     
     @ui.button(label="➕ Add Cargo", style=ButtonStyle.green, emoji="➕", custom_id="add_cargo_clean")
     async def add_cargo(self, interaction: discord.Interaction, button: ui.Button):
-        if not usuario_pode_usar_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas staff pode usar!", ephemeral=True)
+        # Verificar staff
+        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
             return
         
-        modal = CargoModal("add")
+        modal = SimpleCargoModal("add")
         await interaction.response.send_modal(modal)
     
     @ui.button(label="➖ Rem Cargo", style=ButtonStyle.red, emoji="➖", custom_id="remove_cargo_clean")
     async def remove_cargo(self, interaction: discord.Interaction, button: ui.Button):
-        if not usuario_pode_usar_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas staff pode usar!", ephemeral=True)
+        # Verificar staff
+        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
             return
         
-        modal = CargoModal("remove")
+        modal = SimpleCargoModal("remove")
         await interaction.response.send_modal(modal)
     
     @ui.button(label="🔄 Corrigir Nick", style=ButtonStyle.blurple, emoji="🔄", custom_id="fix_nick_clean")
     async def fix_nick(self, interaction: discord.Interaction, button: ui.Button):
-        if not usuario_pode_usar_painel(interaction.user):
-            await interaction.response.send_message("❌ Apenas staff pode usar!", ephemeral=True)
+        # Verificar staff
+        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
             return
         
         await interaction.response.defer(ephemeral=True)
@@ -450,7 +360,7 @@ class CleanCargoView(ui.View):
         await asyncio.sleep(5)
         await msg.delete()
 
-# ========== COG PRINCIPAL ==========
+# ========== COG PRINCIPAL (IGUAL AO BASE) ==========
 class CargosCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -472,7 +382,7 @@ class CargosCog(commands.Cog):
     @commands.command(name="setup_cargos")
     @commands.has_permissions(administrator=True)
     async def setup_cargos(self, ctx):
-        """Cria painel de cargos"""
+        """Cria painel clean de cargos"""
         
         embed = discord.Embed(
             title="⚙️ SISTEMA DE CARGOS",
@@ -482,9 +392,20 @@ class CargosCog(commands.Cog):
                 "2. Digite @usuário ou ID do FiveM\n"
                 "3. Selecione o cargo\n"
                 "✅ Nickname atualiza automaticamente\n\n"
+                "**📌 Importante:**\n"
+                "• O nickname mantém a primeira parte\n"
+                "• ID do FiveM é preservado após ' | '\n"
+                "• Apenas staff pode usar\n\n"
                 "**📌 Formato de Nickname:**\n"
-                "`Prefixo | Nome | ID`\n\n"
-                "**Exemplos:**\n"
+                "`Prefixo | Nome | ID`"
+            ),
+            color=discord.Color.blue()
+        )
+        
+        # Exemplos de nickname
+        embed.add_field(
+            name="🎯 Exemplos de Nickname",
+            value=(
                 "• `00 | Torres | 9237`\n"
                 "• `01 | Torres | 9237`\n"
                 "• `02 | Torres | 9237`\n"
@@ -500,24 +421,12 @@ class CargosCog(commands.Cog):
                 "• `E | Torres | 9237`\n"
                 "• `M | Torres | 9237`"
             ),
-            color=discord.Color.blue()
-        )
-        
-        # Lista de cargos disponíveis
-        cargos_text = ""
-        for cargo_nome in ORDEM_PRIORIDADE:
-            prefixo = CARGO_PARA_PREFIXO.get(cargo_nome, "?")
-            cargos_text += f"• {prefixo} - {cargo_nome}\n"
-        
-        embed.add_field(
-            name="📋 Cargos Disponíveis",
-            value=cargos_text,
             inline=False
         )
         
         embed.add_field(
             name="👑 Staff Permitido",
-            value="\n".join(STAFF_ROLES[:6]) + "\n...",
+            value="\n".join([c.split(' | ')[0] for c in STAFF_ROLES[:6]]) + "\n...",
             inline=False
         )
         
@@ -534,7 +443,8 @@ class CargosCog(commands.Cog):
         if member is None:
             member = ctx.author
         
-        if member != ctx.author and not usuario_pode_usar_painel(ctx.author):
+        # Verificar permissão (só staff pode corrigir outros)
+        if member != ctx.author and not any(role.name in STAFF_ROLES for role in ctx.author.roles):
             await ctx.send("❌ Você não tem permissão para corrigir nickname de outros!", delete_after=5)
             return
         
@@ -547,31 +457,6 @@ class CargosCog(commands.Cog):
         
         await asyncio.sleep(5)
         await msg.delete()
-    
-    @commands.command(name="verificar_prefixo")
-    @commands.has_permissions(administrator=True)
-    async def verificar_prefixo(self, ctx, member: discord.Member = None):
-        """Verifica o prefixo de um usuário"""
-        if member is None:
-            member = ctx.author
-        
-        nickname = member.nick or member.name
-        prefixo = extrair_prefixo_visual(nickname)
-        id_fivem = extrair_id_fivem(nickname)
-        nome = extrair_parte_nickname(nickname)
-        
-        embed = discord.Embed(
-            title="🔍 Verificação de Prefixo",
-            color=discord.Color.blue()
-        )
-        
-        embed.add_field(name="👤 Usuário", value=member.mention, inline=True)
-        embed.add_field(name="🏷️ Nickname", value=f"`{nickname}`", inline=False)
-        embed.add_field(name="🎯 Prefixo", value=f"`{prefixo or 'Nenhum'}`", inline=True)
-        embed.add_field(name="🆔 ID FiveM", value=f"`{id_fivem or 'Nenhum'}`", inline=True)
-        embed.add_field(name="📝 Nome", value=f"`{nome}`", inline=True)
-        
-        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(CargosCog(bot))
