@@ -396,18 +396,21 @@ class GestorCog(commands.Cog):
         
         embed_info = discord.Embed(
             title="🎫 **GESTOR DE FARM**",
-            description=(
-                "**Clique no botão abaixo para abrir um Gestor de Farm**\n\n"
+            description=(   
+                "**clique no botão abaixo para abrir um Gestor de Farm**\n\n"
                 "Use este canal para:\n"
-                "• Dúvidas sobre farm\n"
-                "• Entrega de farm\n"
-                "• Reportar problemas no farm\n"
-                "• Outras questões relacionadas"
+                ". Dúvidas sobre farm\n"
+                ". Entrega de farm\n"
+                ". Reportar problemas no farm\n"
+                ". Outras questões relacionadas"
             ),
             color=discord.Color.purple()
         )
-        
-        embed_info.set_footer(text="Sistema de Gestor de Farm • WaveX")
+
+        embed_info.set_footer(
+            text="Sistema de Gestor de Farm • WaveX",
+            icon_url="https://cdn.discordapp.com/attachments/1473746931003035801/1474722296920015000/image.png"
+        )     
         
         view = GestorOpenView()
         
