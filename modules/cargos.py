@@ -56,6 +56,41 @@ STAFF_ROLES = [
     "🎖️ | Sub Elite",
 ]
 
+# ========== FUNÇÃO DE NORMALIZAÇÃO ==========
+def normalizar_nome(nome: str) -> str:
+    """Remove todos os espaços do nome para comparação flexível"""
+    if not nome:
+        return ""
+    return re.sub(r'\s+', '', nome)
+
+def get_cargo_por_nome_flexivel(guild, nome_busca):
+    """Busca cargo ignorando diferenças de espaços no nome"""
+    if not nome_busca:
+        return None
+    
+    nome_busca_normalizado = normalizar_nome(nome_busca)
+    
+    for role in guild.roles:
+        nome_role_normalizado = normalizar_nome(role.name)
+        if nome_role_normalizado == nome_busca_normalizado:
+            return role
+    
+    return None
+
+def member_tem_cargo_flexivel(member, nome_cargo):
+    """Verifica se o membro tem um cargo ignorando espaços"""
+    if not member or not nome_cargo:
+        return False
+    
+    nome_cargo_normalizado = normalizar_nome(nome_cargo)
+    
+    for role in member.roles:
+        nome_role_normalizado = normalizar_nome(role.name)
+        if nome_role_normalizado == nome_cargo_normalizado:
+            return True
+    
+    return False
+
 # ========== FUNÇÕES AUXILIARES (IGUAL AO BASE) ==========
 def buscar_usuario_por_fivem_id(guild: discord.Guild, fivem_id: str) -> discord.Member:
     """Busca usuário pelo ID do FiveM no nickname"""
@@ -109,10 +144,10 @@ async def atualizar_nickname(member: discord.Member):
         if not id_fivem:
             id_fivem = "000000"
         
-        # Encontrar cargo principal (igual ao base)
+        # Encontrar cargo principal (usando busca flexível)
         cargo_principal = None
         for cargo_nome in ORDEM_PRIORIDADE:
-            if discord.utils.get(member.roles, name=cargo_nome):
+            if member_tem_cargo_flexivel(member, cargo_nome):
                 cargo_principal = cargo_nome
                 break
         
@@ -137,7 +172,7 @@ async def atualizar_nickname(member: discord.Member):
     
     return False
 
-# ========== SISTEMA DE SELEÇÃO DE CARGO (IGUAL AO BASE) ==========
+# ========== SISTEMA DE SELEÇÃO DE CARGO ==========
 class CargoSelectView(ui.View):
     """View simples para selecionar cargo"""
     def __init__(self, member: discord.Member, action: str):
@@ -148,8 +183,13 @@ class CargoSelectView(ui.View):
         # Opções de cargo
         options = []
         for cargo_nome in ORDEM_PRIORIDADE:
-            # Extrair prefixo para mostrar (opcional)
-            prefixo = cargo_nome.split(' | ')[0] if ' | ' in cargo_nome else cargo_nome
+            # Extrair prefixo para mostrar
+            if " | " in cargo_nome:
+                partes = cargo_nome.split(' | ')
+                prefixo = partes[0] if len(partes) > 0 else cargo_nome
+            else:
+                prefixo = cargo_nome
+            
             options.append(
                 discord.SelectOption(
                     label=prefixo,
@@ -169,10 +209,12 @@ class CargoSelectView(ui.View):
         await interaction.response.defer(ephemeral=True)
         
         cargo_nome = self.select.values[0]
-        cargo = discord.utils.get(interaction.guild.roles, name=cargo_nome)
+        
+        # Usar busca flexível em vez de discord.utils.get
+        cargo = get_cargo_por_nome_flexivel(interaction.guild, cargo_nome)
         
         if not cargo:
-            msg = await interaction.followup.send("❌ Cargo não encontrado!", ephemeral=True)
+            msg = await interaction.followup.send("❌ Cargo não encontrado no servidor!", ephemeral=True)
             await asyncio.sleep(5)
             await msg.delete()
             return
@@ -222,8 +264,17 @@ class SimpleCargoModal(ui.Modal, title="🎯 Gerenciar Cargo"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
-        # Verificar se é staff
-        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
+        # Verificar se é staff (usando busca flexível)
+        is_staff = False
+        for role in interaction.user.roles:
+            for cargo_staff in STAFF_ROLES:
+                if normalizar_nome(role.name) == normalizar_nome(cargo_staff):
+                    is_staff = True
+                    break
+            if is_staff:
+                break
+        
+        if not is_staff and not interaction.user.guild_permissions.administrator:
             msg = await interaction.followup.send("❌ Apenas staff pode usar!", ephemeral=True)
             await asyncio.sleep(5)
             await msg.delete()
@@ -323,8 +374,17 @@ class CleanCargoView(ui.View):
     
     @ui.button(label="➕ Add Cargo", style=ButtonStyle.green, emoji="➕", custom_id="add_cargo_clean")
     async def add_cargo(self, interaction: discord.Interaction, button: ui.Button):
-        # Verificar staff
-        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
+        # Verificar staff (usando busca flexível)
+        is_staff = False
+        for role in interaction.user.roles:
+            for cargo_staff in STAFF_ROLES:
+                if normalizar_nome(role.name) == normalizar_nome(cargo_staff):
+                    is_staff = True
+                    break
+            if is_staff:
+                break
+        
+        if not is_staff and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
             return
         
@@ -333,8 +393,17 @@ class CleanCargoView(ui.View):
     
     @ui.button(label="➖ Rem Cargo", style=ButtonStyle.red, emoji="➖", custom_id="remove_cargo_clean")
     async def remove_cargo(self, interaction: discord.Interaction, button: ui.Button):
-        # Verificar staff
-        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
+        # Verificar staff (usando busca flexível)
+        is_staff = False
+        for role in interaction.user.roles:
+            for cargo_staff in STAFF_ROLES:
+                if normalizar_nome(role.name) == normalizar_nome(cargo_staff):
+                    is_staff = True
+                    break
+            if is_staff:
+                break
+        
+        if not is_staff and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
             return
         
@@ -343,8 +412,17 @@ class CleanCargoView(ui.View):
     
     @ui.button(label="🔄 Corrigir Nick", style=ButtonStyle.blurple, emoji="🔄", custom_id="fix_nick_clean")
     async def fix_nick(self, interaction: discord.Interaction, button: ui.Button):
-        # Verificar staff
-        if not any(role.name in STAFF_ROLES for role in interaction.user.roles):
+        # Verificar staff (usando busca flexível)
+        is_staff = False
+        for role in interaction.user.roles:
+            for cargo_staff in STAFF_ROLES:
+                if normalizar_nome(role.name) == normalizar_nome(cargo_staff):
+                    is_staff = True
+                    break
+            if is_staff:
+                break
+        
+        if not is_staff and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
             return
         
@@ -360,7 +438,7 @@ class CleanCargoView(ui.View):
         await asyncio.sleep(5)
         await msg.delete()
 
-# ========== COG PRINCIPAL (IGUAL AO BASE) ==========
+# ========== COG PRINCIPAL ==========
 class CargosCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -426,11 +504,11 @@ class CargosCog(commands.Cog):
         
         embed.add_field(
             name="👑 Staff Permitido",
-            value="\n".join([c.split(' | ')[0] for c in STAFF_ROLES[:6]]) + "\n...",
+            value="\n".join([c.split(' | ')[0] if ' | ' in c else c for c in STAFF_ROLES[:6]]) + "\n...",
             inline=False
         )
         
-        embed.set_footer(text="Sistema Clean • Mensagens auto-deletam em 5s")
+        embed.set_footer(text="Sistema Clean • Busca flexível • Mensagens auto-deletam em 5s")
         
         view = CleanCargoView()
         
@@ -443,10 +521,20 @@ class CargosCog(commands.Cog):
         if member is None:
             member = ctx.author
         
-        # Verificar permissão (só staff pode corrigir outros)
-        if member != ctx.author and not any(role.name in STAFF_ROLES for role in ctx.author.roles):
-            await ctx.send("❌ Você não tem permissão para corrigir nickname de outros!", delete_after=5)
-            return
+        # Verificar permissão (só staff pode corrigir outros) - usando busca flexível
+        if member != ctx.author:
+            is_staff = False
+            for role in ctx.author.roles:
+                for cargo_staff in STAFF_ROLES:
+                    if normalizar_nome(role.name) == normalizar_nome(cargo_staff):
+                        is_staff = True
+                        break
+                if is_staff:
+                    break
+            
+            if not is_staff and not ctx.author.guild_permissions.administrator:
+                await ctx.send("❌ Você não tem permissão para corrigir nickname de outros!", delete_after=5)
+                return
         
         success = await atualizar_nickname(member)
         
