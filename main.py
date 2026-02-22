@@ -160,11 +160,18 @@ async def custom_help(ctx, *, comando: str = None):
         value="`!limpar` `!limpar 50` `!limpar canal #geral 30`",
         inline=False
     )
+
+    # Comandos de Cargos
+    embed.add_field(
+        name="🔢 **'hierarquia**",
+        value="`!setup_cargos` `!fixnick`",
+        inline=False
+    )
     
     # Comandos de Cargos
     embed.add_field(
         name="⚙️ **Cargos**",
-        value="`!setup_cargos` `!fixnick`",
+        value="`!setup_hierarquia`",
         inline=False
     )
     
@@ -226,6 +233,7 @@ async def load_cogs():
         'modules.cargos',  # Seu sistema de cargos
         'modules.painel_rec',  # ← ADICIONE ESTA LINHA
         'modules.limpeza',  # Se tiver o sistema de limpeza
+        'modules.painel_hierarquia', 
     ]
     
     carregados = 0
