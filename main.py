@@ -163,7 +163,7 @@ async def custom_help(ctx, *, comando: str = None):
 
     # Comandos de Cargos
     embed.add_field(
-        name="🔢 **'hierarquia**",
+        name="🔢 **Hierarquia**",
         value="`!setup_hierarquia`",
         inline=False
     )
