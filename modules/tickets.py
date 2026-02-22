@@ -9,39 +9,53 @@ import json
 import os
 
 # ========== CONFIGURAÇÃO ==========
-# ID do cargo base (deste para cima NÃO PODEM ver o painel)
-CARGO_BASE_ID = 1393998691354018094
+# Cargos de staff (mesmos do sistema de cargos)
+STAFF_ROLES = [
+    "👑 | Lider | 00",
+    "💎 | Lider | 01",
+    "👮 | Lider | 02",
+    "🎖️ | Lider | 03",
+    "🎖️ | Gerente Geral",
+    "🎖️ | Gerente De Farm",
+    "🎖️ | Gerente De Pista",
+    "🎖️ | Gerente de Recrutamento",
+    "🎖️ | Supervisor",
+    "🎖️ | Recrutador",
+    "🎖️ | Ceo Elite",
+    "🎖️ | Sub Elite",
+]
 
-# ========== FUNÇÕES AUXILIARES ==========
+def normalizar_nome(nome: str) -> str:
+    """Remove todos os espaços do nome para comparação flexível"""
+    if not nome:
+        return ""
+    return re.sub(r'\s+', '', nome)
+
 def usuario_e_staff(member: discord.Member) -> bool:
-    """Verifica se o usuário TEM cargo >= cargo base (NÃO PODE ver painel)"""
+    """Verifica se o usuário TEM cargo de staff (pode ver painéis)"""
     if not member:
         return False
     
+    # Admin sempre pode
     if member.guild_permissions.administrator:
         return True
     
-    cargo_base = member.guild.get_role(CARGO_BASE_ID)
-    if not cargo_base:
-        print(f"⚠️ Cargo base ID {CARGO_BASE_ID} não encontrado!")
-        return False
-    
+    # Verificar se tem cargo staff (com normalização)
     for role in member.roles:
-        if role.position >= cargo_base.position:
-            return True
+        for cargo_staff in STAFF_ROLES:
+            if normalizar_nome(role.name) == normalizar_nome(cargo_staff):
+                return True
     
     return False
 
 def get_cargos_staff(guild: discord.Guild) -> list:
-    """Retorna lista de cargos com posição >= cargo base (staff)"""
-    cargo_base = guild.get_role(CARGO_BASE_ID)
-    if not cargo_base:
-        return []
-    
+    """Retorna lista de cargos de staff do servidor"""
     cargos_staff = []
     for role in guild.roles:
-        if role.position >= cargo_base.position:
-            cargos_staff.append(role)
+        for cargo_nome in STAFF_ROLES:
+            if normalizar_nome(role.name) == normalizar_nome(cargo_nome):
+                cargos_staff.append(role)
+                break
     
     return sorted(cargos_staff, key=lambda r: r.position, reverse=True)
 
@@ -447,24 +461,24 @@ ticket_logger = TicketLogger()
 # ========== CLASSES PRINCIPAIS ==========
 
 class TicketFinalizadoView(ui.View):
-    """View após ticket fechado - USUÁRIO NÃO PODE FAZER NADA"""
+    """View após ticket fechado - APENAS STAFF PODE VER"""
     def __init__(self, ticket_owner_id, ticket_channel):
         super().__init__(timeout=None)
         self.ticket_owner_id = ticket_owner_id
         self.ticket_channel = ticket_channel
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        """Bloquear qualquer interação de usuário"""
+        """Apenas staff pode interagir"""
         if not usuario_e_staff(interaction.user):
             await interaction.response.send_message(
-                "❌ Você não pode interagir com tickets fechados! Aguarde a staff.",
+                "❌ Apenas a staff pode interagir com tickets fechados!",
                 ephemeral=True
             )
             return False
         return True
     
-    @ui.button(label="✅ Reabrir Ticket (Staff)", style=ButtonStyle.green, custom_id="staff_reabrir_ticket")
-    async def reabrir_ticket_staff(self, interaction: discord.Interaction, button: ui.Button):
+    @ui.button(label="✅ Reabrir Ticket", style=ButtonStyle.green, custom_id="staff_reabrir_ticket")
+    async def reabrir_ticket(self, interaction: discord.Interaction, button: ui.Button):
         """Apenas staff pode reabrir"""
         await interaction.response.defer()
         
@@ -763,7 +777,7 @@ class TicketOpenView(ui.View):
                     send_messages=True,
                     read_message_history=True
                 )
-                print(f"[TICKET] Cargo staff adicionado: {role.name} (posição: {role.position})")
+                print(f"[TICKET] Cargo staff adicionado: {role.name}")
             
             # 6. CRIAR CANAL
             nome_usuario = interaction.user.display_name
@@ -853,12 +867,6 @@ class TicketsCog(commands.Cog):
         """Configura o painel de tickets"""
         print(f"[SETUP] Configurando painel por {ctx.author.name}")
         
-        # Verificar se o cargo base existe
-        cargo_base = ctx.guild.get_role(CARGO_BASE_ID)
-        if not cargo_base:
-            await ctx.send(f"⚠️ **Cargo base não encontrado!**\nID: `{CARGO_BASE_ID}`\nVerifique se o ID está correto.")
-            return
-        
         embed_info = discord.Embed(
             title="🎫 **SISTEMA DE TICKETS**",
             description=(
@@ -885,37 +893,34 @@ class TicketsCog(commands.Cog):
     @commands.command(name="verificar_acesso")
     @commands.has_permissions(administrator=True)
     async def verificar_acesso(self, ctx, member: discord.Member = None):
-        """Verifica se um membro pode ver o painel"""
+        """Verifica se um membro é staff"""
         if member is None:
             member = ctx.author
         
         e_staff = usuario_e_staff(member)
         
-        cargo_base = ctx.guild.get_role(CARGO_BASE_ID)
-        
         embed = discord.Embed(
             title="🔍 Verificação de Acesso",
-            color=discord.Color.green() if not e_staff else discord.Color.red()
+            color=discord.Color.green() if e_staff else discord.Color.red()
         )
         
         embed.add_field(name="👤 Usuário", value=member.mention, inline=True)
         embed.add_field(name="👑 É Staff?", value="SIM" if e_staff else "NÃO", inline=True)
         
-        if cargo_base:
-            embed.add_field(name="🎯 Cargo Base", value=f"{cargo_base.mention}\nPosição: {cargo_base.position}", inline=True)
-            
-            # Listar cargos do usuário
-            cargos_staff = []
-            for role in member.roles:
-                if role.position >= cargo_base.position and role.name != "@everyone":
-                    cargos_staff.append(f"{role.name} (pos: {role.position})")
-            
-            if cargos_staff:
-                embed.add_field(
-                    name="📋 Cargos de Staff",
-                    value="\n".join(cargos_staff[:5]),
-                    inline=False
-                )
+        # Listar cargos de staff do usuário
+        cargos_staff = []
+        for role in member.roles:
+            for cargo_nome in STAFF_ROLES:
+                if normalizar_nome(role.name) == normalizar_nome(cargo_nome):
+                    cargos_staff.append(role.name)
+                    break
+        
+        if cargos_staff:
+            embed.add_field(
+                name="📋 Cargos de Staff",
+                value="\n".join(cargos_staff[:5]),
+                inline=False
+            )
         
         await ctx.send(embed=embed)
     
