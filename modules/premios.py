@@ -7,11 +7,18 @@ from datetime import datetime
 # ========== CONFIGURAÇÃO ==========
 # Cargos que podem usar o comando (staff)
 STAFF_ROLES = [
-    "👑┃OWNER",
-    "👑┃CEO", 
-    "👤┃GERENTE",
-    "👤┃RESP. ELITE",
-    "🎫┃RESP. E-MAIL"
+    "👑 | Lider | 00",
+    "💎 | Lider | 01",
+    "👮 | Lider | 02",
+    "🎖️ | Lider | 03",
+    "🎖️ | Gerente Geral",
+    "🎖️ | Gerente De Farm",
+    "🎖️ | Gerente De Pista",
+    "🎖️ | Gerente de Recrutamento",
+    "🎖️ | Supervisor",
+    "🎖️ | Recrutador",
+    "🎖️ | Ceo Elite",
+    "🎖️ | Sub Elite",
 ]
 
 # ========== PRESETS DE MENSAGENS ==========
