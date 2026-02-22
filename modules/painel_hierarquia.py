@@ -8,26 +8,27 @@ import os
 import re
 
 # ========== CONFIGURAÇÃO ==========
-# Cargos em ordem hierárquica (do maior para o menor)
-CARGOS_HIERARQUIA = [
-    {"nome": "👑 Lider 00", "emoji": "👑", "display": "00"},
-    {"nome": "💎 Lider 01", "emoji": "💎", "display": "01"},
-    {"nome": "👮 Lider 02", "emoji": "👮", "display": "02"},
-    {"nome": "🎖️ Lider 03", "emoji": "🎖️", "display": "03"},
-    {"nome": "🎖️ Gerente Geral", "emoji": "📊", "display": "G.Geral"},
-    {"nome": "🎖️ Gerente De Farm", "emoji": "🌾", "display": "G.Farm"},
-    {"nome": "🎖️ Gerente De Pista", "emoji": "🏁", "display": "G.Pista"},
-    {"nome": "🎖️ Gerente de Recrutamento", "emoji": "🤝", "display": "G.Rec"},
-    {"nome": "🎖️ Supervisor", "emoji": "👁️", "display": "Sup"},
-    {"nome": "🎖️ Recrutador", "emoji": "🔍", "display": "Rec"},
-    {"nome": "🎖️ Ceo Elite", "emoji": "👑", "display": "Ceo E"},
-    {"nome": "🎖️ Sub Elite", "emoji": "⭐", "display": "Sub E"},
-    {"nome": "🎖️ Elite", "emoji": "✨", "display": "E"},
-    {"nome": "🙅‍♂️ Membro", "emoji": "👤", "display": "M"},
-]
-
 # Arquivo para salvar o painel
 ARQUIVO_PAINEIS = "paineis_hierarquia.json"
+
+# Mapeamento de nomes de cargos REAIS para exibição
+# Use os nomes EXATOS dos cargos no seu servidor
+CARGOS_REAIS = [
+    {"nome": "👑 | Lider | 00", "display": "00", "emoji": "👑"},
+    {"nome": "💎 | Lider | 01", "display": "01", "emoji": "💎"},
+    {"nome": "👮 | Lider | 02", "display": "02", "emoji": "👮"},
+    {"nome": "🎖️ | Lider | 03", "display": "03", "emoji": "🎖️"},
+    {"nome": "🎖️ | Gerente Geral", "display": "G.Geral", "emoji": "📊"},
+    {"nome": "🎖️ | Gerente De Farm", "display": "G.Farm", "emoji": "🌾"},
+    {"nome": "🎖️ | Gerente De Pista", "display": "G.Pista", "emoji": "🏁"},
+    {"nome": "🎖️ | Gerente de Recrutamento", "display": "G.Rec", "emoji": "🤝"},
+    {"nome": "🎖️ | Supervisor", "display": "Sup", "emoji": "👁️"},
+    {"nome": "🎖️ | Recrutador", "display": "Rec", "emoji": "🔍"},
+    {"nome": "🎖️ | Ceo Elite", "display": "Ceo E", "emoji": "👑"},
+    {"nome": "🎖️ | Sub Elite", "display": "Sub E", "emoji": "⭐"},
+    {"nome": "🎖️ | Elite", "display": "E", "emoji": "✨"},
+    {"nome": "🙅‍♂️ | Membro", "display": "M", "emoji": "👤"},
+]
 
 def normalizar_nome(nome: str) -> str:
     """Remove todos os espaços do nome para comparação flexível"""
@@ -35,19 +36,17 @@ def normalizar_nome(nome: str) -> str:
         return ""
     return re.sub(r'\s+', '', nome)
 
-def get_cargo_display(role_name: str) -> str:
-    """Retorna o display name do cargo baseado no nome real"""
-    for cargo in CARGOS_HIERARQUIA:
-        if normalizar_nome(cargo["nome"]) == normalizar_nome(role_name):
-            return cargo["display"]
-    return "?"
-
-def get_cargo_emoji(role_name: str) -> str:
-    """Retorna o emoji do cargo baseado no nome real"""
-    for cargo in CARGOS_HIERARQUIA:
-        if normalizar_nome(cargo["nome"]) == normalizar_nome(role_name):
-            return cargo["emoji"]
-    return "❓"
+def extrair_nome_limpo(nickname: str) -> str:
+    """Extrai apenas o nome do usuário (sem prefixo e ID)"""
+    if not nickname:
+        return None
+    
+    # Formato esperado: "00 | Nome | ID" ou "M | Nome | ID"
+    partes = nickname.split(' | ')
+    if len(partes) >= 2:
+        return partes[1].strip()
+    
+    return nickname
 
 # ========== VIEW DO PAINEL ==========
 class PainelHierarquiaView(ui.View):
@@ -79,82 +78,119 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
     def criar_embed_hierarquia(self, guild):
         """Cria o embed com a hierarquia completa do servidor"""
         
-        # Organizar membros por cargo
-        membros_por_cargo = {cargo["display"]: [] for cargo in CARGOS_HIERARQUIA}
+        # Dicionário para armazenar membros por cargo
+        membros_por_cargo = {}
         
+        # Inicializar listas vazias para cada cargo
+        for cargo_info in CARGOS_REAIS:
+            membros_por_cargo[cargo_info["nome"]] = []
+        
+        # Percorrer todos os membros do servidor
         for member in guild.members:
             if member.bot:
                 continue  # Ignorar bots
             
-            # Encontrar o cargo mais alto do membro
+            # Verificar os cargos do membro
             cargo_encontrado = None
-            for cargo_info in CARGOS_HIERARQUIA:
-                for role in member.roles:
+            for role in member.roles:
+                for cargo_info in CARGOS_REAIS:
                     if normalizar_nome(role.name) == normalizar_nome(cargo_info["nome"]):
-                        cargo_encontrado = cargo_info["display"]
+                        cargo_encontrado = cargo_info["nome"]
                         break
                 if cargo_encontrado:
                     break
             
             if cargo_encontrado:
-                # Adicionar à lista do cargo
-                nome_exibicao = member.display_name
-                if member.nick:
-                    # Tentar extrair apenas o nome (sem prefixo e ID)
-                    partes = member.nick.split(' | ')
-                    if len(partes) >= 2:
-                        nome_exibicao = partes[1].strip()
+                # Extrair nome limpo (sem prefixo e ID)
+                nome_limpo = extrair_nome_limpo(member.nick or member.name)
+                if not nome_limpo:
+                    nome_limpo = member.name.split('#')[0]
                 
+                # Adicionar à lista
                 membros_por_cargo[cargo_encontrado].append({
-                    "nome": nome_exibicao,
+                    "nome": nome_limpo,
                     "mention": member.mention,
-                    "nick": member.nick or member.name
+                    "nick_completo": member.nick or member.name
                 })
         
         # Criar o embed
         embed = discord.Embed(
             title="📋 **HIERARQUIA DO SERVIDOR**",
-            description="Estrutura organizacional completa do servidor",
+            description="Lista completa de membros organizados por cargo:",
             color=discord.Color.gold()
         )
         
-        # Adicionar campos para cada cargo (do maior para o menor)
         total_membros = 0
-        for cargo_info in CARGOS_HIERARQUIA:
+        
+        # Adicionar campos para cada cargo (do maior para o menor)
+        for cargo_info in CARGOS_REAIS:
+            cargo_nome = cargo_info["nome"]
             display = cargo_info["display"]
             emoji = cargo_info["emoji"]
-            membros = membros_por_cargo.get(display, [])
+            membros = membros_por_cargo.get(cargo_nome, [])
             quantidade = len(membros)
             total_membros += quantidade
             
             if quantidade == 0:
                 valor = "`Nenhum membro`"
-            elif quantidade <= 5:
-                # Mostrar todos se forem poucos
-                nomes = []
-                for m in membros:
-                    # Limitar tamanho do nome
-                    nome = m["nome"][:20]
-                    nomes.append(f"`{nome}`")
-                valor = ", ".join(nomes)
             else:
-                # Mostrar os primeiros 5 e indicar quantos mais
-                nomes = []
-                for m in membros[:5]:
-                    nome = m["nome"][:20]
-                    nomes.append(f"`{nome}`")
-                valor = ", ".join(nomes) + f" e mais {quantidade - 5}"
-            
-            embed.add_field(
-                name=f"{emoji} **{display}** ─ `{quantidade}`",
-                value=valor[:1024] or "`Nenhum membro`",  # Discord limit
-                inline=False
-            )
+                # Criar lista com todos os membros (formato @nome)
+                lista_membros = []
+                for m in membros:
+                    # Usar @mention para que apareça como menção clicável
+                    lista_membros.append(m["mention"])
+                
+                # Juntar todos com vírgula
+                valor = ", ".join(lista_membros)
+                
+                # Se ultrapassar o limite do Discord (1024 caracteres), dividir em múltiplos campos
+                if len(valor) > 1024:
+                    # Dividir em partes
+                    partes = []
+                    parte_atual = []
+                    tamanho_atual = 0
+                    
+                    for m in membros:
+                        menc = m["mention"]
+                        if tamanho_atual + len(menc) + 2 > 1000:  # Deixar margem
+                            partes.append(", ".join(parte_atual))
+                            parte_atual = [menc]
+                            tamanho_atual = len(menc)
+                        else:
+                            if parte_atual:
+                                tamanho_atual += len(menc) + 2  # +2 para ", "
+                            else:
+                                tamanho_atual += len(menc)
+                            parte_atual.append(menc)
+                    
+                    if parte_atual:
+                        partes.append(", ".join(parte_atual))
+                    
+                    # Primeira parte no campo principal
+                    embed.add_field(
+                        name=f"{emoji} **{display}** ─ `{quantidade}`",
+                        value=partes[0][:1024],
+                        inline=False
+                    )
+                    
+                    # Partes adicionais como campos extras
+                    for i, parte in enumerate(partes[1:], 1):
+                        embed.add_field(
+                            name=f"{emoji} **{display}** (continuação {i})",
+                            value=parte[:1024],
+                            inline=False
+                        )
+                else:
+                    embed.add_field(
+                        name=f"{emoji} **{display}** ─ `{quantidade}`",
+                        value=valor[:1024] or "`Nenhum membro`",
+                        inline=False
+                    )
         
         # Total de membros
         embed.add_field(
             name="📊 **TOTAL**",
-            value=f"`{total_membros}` membros organizados",
+            value=f"`{total_membros}` membros no servidor",
             inline=False
         )
         
