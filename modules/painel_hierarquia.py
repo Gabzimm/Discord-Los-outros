@@ -99,7 +99,7 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
         print("✅ Módulo PainelHierarquia carregado!")
     
     def criar_embed_hierarquia(self, guild):
-        """Cria o embed com a hierarquia completa do servidor"""
+        """Cria o embed com a hierarquia completa - TODOS OS CARGOS VISÍVEIS"""
         
         # Dicionário para armazenar membros por cargo
         membros_por_cargo = {cargo["display"]: [] for cargo in CARGOS_REAIS}
@@ -130,13 +130,13 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
         # Criar o embed
         embed = discord.Embed(
             title="📋 **HIERARQUIA DO SERVIDOR**",
-            description="Lista completa de membros organizados por cargo:",
+            description="Estrutura completa de cargos do servidor:",
             color=discord.Color.gold()
         )
         
         total_membros = 0
         
-        # Adicionar campos para cada cargo (em ordem de prioridade)
+        # MOSTRAR TODOS OS CARGOS, mesmo com 0 membros
         for cargo_info in sorted(CARGOS_REAIS, key=lambda x: x["prioridade"]):
             display = cargo_info["display"]
             emoji = cargo_info["emoji"]
@@ -145,33 +145,31 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
             total_membros += quantidade
             
             if quantidade == 0:
+                # Mostrar que não tem ninguém neste cargo
                 valor = "`Nenhum membro`"
             else:
-                # Criar lista com todos os membros (formato @nome)
+                # Criar lista com todos os membros
                 lista_membros = []
                 for m in membros:
-                    # Usar @mention para que apareça como menção clicável
                     lista_membros.append(m["mention"])
                 
-                # Juntar todos com vírgula
                 valor = ", ".join(lista_membros)
                 
-                # Se ultrapassar o limite do Discord (1024 caracteres), dividir em múltiplos campos
+                # Se ultrapassar o limite, dividir em múltiplos campos
                 if len(valor) > 1024:
-                    # Dividir em partes
                     partes = []
                     parte_atual = []
                     tamanho_atual = 0
                     
                     for m in membros:
                         menc = m["mention"]
-                        if tamanho_atual + len(menc) + 2 > 1000:  # Deixar margem
+                        if tamanho_atual + len(menc) + 2 > 1000:
                             partes.append(", ".join(parte_atual))
                             parte_atual = [menc]
                             tamanho_atual = len(menc)
                         else:
                             if parte_atual:
-                                tamanho_atual += len(menc) + 2  # +2 para ", "
+                                tamanho_atual += len(menc) + 2
                             else:
                                 tamanho_atual += len(menc)
                             parte_atual.append(menc)
@@ -179,24 +177,24 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
                     if parte_atual:
                         partes.append(", ".join(parte_atual))
                     
-                    # Primeira parte no campo principal
+                    # Primeira parte
                     embed.add_field(
                         name=f"{emoji} **{display}** ─ `{quantidade}`",
                         value=partes[0][:1024],
                         inline=False
                     )
                     
-                    # Partes adicionais como campos extras
+                    # Partes adicionais
                     for i, parte in enumerate(partes[1:], 1):
                         embed.add_field(
-                            name=f"{emoji} **{display}** (continuação {i})",
+                            name=f"{emoji} **{display}** (cont. {i})",
                             value=parte[:1024],
                             inline=False
                         )
                 else:
                     embed.add_field(
                         name=f"{emoji} **{display}** ─ `{quantidade}`",
-                        value=valor[:1024] or "`Nenhum membro`",
+                        value=valor[:1024],
                         inline=False
                     )
         
@@ -350,7 +348,7 @@ class PainelHierarquiaCog(commands.Cog, name="PainelHierarquia"):
         
         self.bot.add_view(PainelHierarquiaView(), message_id=mensagem.id)
         
-        confirm = await ctx.send("✅ **Painel de hierarquia criado com sucesso!** Ele será atualizado automaticamente.")
+        confirm = await ctx.send("✅ **Painel de hierarquia criado com sucesso!** Todos os cargos são mostrados.")
         await asyncio.sleep(3)
         await confirm.delete()
         await ctx.message.delete()
