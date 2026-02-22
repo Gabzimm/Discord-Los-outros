@@ -12,7 +12,45 @@ ARQUIVO_RECRUTADORES = "recrutadores.json"
 ARQUIVO_RECRUTAS = "recrutas.json"
 ARQUIVO_HISTORICO = "historico_recrutadores.json"
 ARQUIVO_RECORDES = "recordes.json"
-CARGO_PERMITIDO_ID = 1393998691354018094
+
+# Cargos de staff (mesmos do sistema de cargos)
+STAFF_ROLES = [
+    "👑 | Lider | 00",
+    "💎 | Lider | 01",
+    "👮 | Lider | 02",
+    "🎖️ | Lider | 03",
+    "🎖️ | Gerente Geral",
+    "🎖️ | Gerente De Farm",
+    "🎖️ | Gerente De Pista",
+    "🎖️ | Gerente de Recrutamento",
+    "🎖️ | Supervisor",
+    "🎖️ | Recrutador",
+    "🎖️ | Ceo Elite",
+    "🎖️ | Sub Elite",
+]
+
+def normalizar_nome(nome: str) -> str:
+    """Remove todos os espaços do nome para comparação flexível"""
+    if not nome:
+        return ""
+    return re.sub(r'\s+', '', nome)
+
+def usuario_pode_usar_painel(member: discord.Member) -> bool:
+    """Verifica se o usuário pode usar o painel (mesmo sistema do cargos.py)"""
+    if not member:
+        return False
+    
+    # Admin sempre pode
+    if member.guild_permissions.administrator:
+        return True
+    
+    # Verificar se tem cargo staff (com normalização)
+    for role in member.roles:
+        for cargo_staff in STAFF_ROLES:
+            if normalizar_nome(role.name) == normalizar_nome(cargo_staff):
+                return True
+    
+    return False
 
 class GerenciadorRecrutadores:
     """Gerencia os dados de recrutadores e recrutas"""
@@ -269,8 +307,8 @@ class PainelRecView(ui.View):
     async def rcs_pagos(self, interaction: discord.Interaction, button: ui.Button):
         """Abre o painel de gerenciamento de RCs pagos"""
         
-        # Verificar se tem o cargo permitido
-        if not any(role.id == CARGO_PERMITIDO_ID for role in interaction.user.roles):
+        # Verificar se pode usar o painel (mesmo sistema do cargos.py)
+        if not usuario_pode_usar_painel(interaction.user):
             await interaction.response.send_message("❌ Você não tem permissão para acessar este painel!", ephemeral=True)
             return
         
@@ -311,8 +349,8 @@ class PainelRecView(ui.View):
     async def historico(self, interaction: discord.Interaction, button: ui.Button):
         """Mostra o histórico do mês passado e recordes"""
         
-        # Verificar permissão
-        if not any(role.id == CARGO_PERMITIDO_ID for role in interaction.user.roles):
+        # Verificar se pode usar o painel
+        if not usuario_pode_usar_painel(interaction.user):
             await interaction.response.send_message("❌ Você não tem permissão para acessar este painel!", ephemeral=True)
             return
         
@@ -523,7 +561,7 @@ class RecrutasPagosView(ui.View):
     
     @ui.button(label="✅ Marcar como Pago", style=ButtonStyle.success, custom_id="recrutas_marcar_pago")
     async def marcar_pago(self, interaction: discord.Interaction, button: ui.Button):
-        if not any(role.id == CARGO_PERMITIDO_ID for role in interaction.user.roles):
+        if not usuario_pode_usar_painel(interaction.user):
             await interaction.response.send_message("❌ Você não tem permissão para marcar recrutas como pagos!", ephemeral=True)
             return
         
