@@ -6,25 +6,36 @@ from datetime import datetime
 import re
 
 # ========== CONFIGURAÇÃO ==========
-CARGO_BASE_APROVACAO_ID = 1421254143103996045
+STAFF_ROLES = [
+    "👑 | Lider | 00",
+    "💎 | Lider | 01",
+    "👮 | Lider | 02",
+    "🎖️ | Lider | 03",
+    "🎖️ | Gerente Geral",
+    "🎖️ | Gerente De Farm",
+    "🎖️ | Gerente De Pista",
+    "🎖️ | Gerente de Recrutamento",
+    "🎖️ | Supervisor",
+    "🎖️ | Recrutador",
+    "🎖️ | Ceo Elite",
+    "🎖️ | Sub Elite",
+]
 
 # Dicionário compartilhado com main.py
 canais_aprovacao = {}
 
 def usuario_pode_aprovar(member: discord.Member) -> bool:
-    """Verifica se o usuário pode aprovar sets"""
+    """Verifica se o usuário pode aprovar sets baseado nos cargos de staff"""
     if not member:
         return False
     
+    # Admin sempre pode
     if member.guild_permissions.administrator:
         return True
     
-    cargo_base = member.guild.get_role(CARGO_BASE_APROVACAO_ID)
-    if not cargo_base:
-        return False
-    
+    # Verificar se tem algum cargo de staff
     for role in member.roles:
-        if role.position >= cargo_base.position:
+        if role.name in STAFF_ROLES:
             return True
     
     return False
@@ -35,6 +46,21 @@ def buscar_usuario_por_id_fivem(guild: discord.Guild, fivem_id: str) -> discord.
         if member.nick and member.nick.endswith(f" | {fivem_id}"):
             return member
     return None
+
+def verificar_id_disponivel(guild: discord.Guild, fivem_id: str) -> tuple:
+    """
+    Verifica se um ID está disponível para uso
+    Retorna (disponivel: bool, motivo: str, membro: discord.Member or None)
+    """
+    fivem_id = str(fivem_id)
+    
+    # Verificar nos nicknames ATUAIS
+    for member in guild.members:
+        if member.nick and member.nick.endswith(f" | {fivem_id}"):
+            return False, f"❌ ID `{fivem_id}` já está em uso por {member.mention}", member
+    
+    # Se não encontrou ninguém usando, está disponível
+    return True, f"✅ ID `{fivem_id}` está disponível!", None
 
 # ========== VIEW DO STAFF ==========
 class SetStaffView(ui.View):
@@ -60,6 +86,17 @@ class SetStaffView(ui.View):
             member = interaction.guild.get_member(self.user_id)
             if not member:
                 await interaction.followup.send("❌ Usuário não encontrado!", ephemeral=True)
+                return
+            
+            # ANTES de aprovar, verificar se o ID ainda está disponível
+            disponivel, motivo, usuario_existente = verificar_id_disponivel(interaction.guild, self.fivem_id)
+            
+            if not disponivel and usuario_existente and usuario_existente.id != member.id:
+                await interaction.followup.send(
+                    f"❌ Não é possível aprovar! {motivo}\n"
+                    f"Este ID já está sendo usado por outro membro.",
+                    ephemeral=True
+                )
                 return
             
             novo_nick = f"M | {self.game_nick} | {self.fivem_id}"
@@ -91,6 +128,16 @@ class SetStaffView(ui.View):
             
             if self.recrutador_nome:
                 embed.description += f"\n✅ **Recrutado por:** {self.recrutador_nome}"
+            
+            # Disparar evento para o painel de recrutadores
+            if self.recrutador_id and self.recrutador_nome:
+                interaction.client.dispatch('recrutamento_contabilizar', {
+                    'recrutador_id': self.recrutador_id,
+                    'recrutador_nome': self.recrutador_nome,
+                    'recrutado_id': self.user_id,
+                    'recrutado_nome': member.name,
+                    'data': datetime.now().isoformat()
+                })
             
             self.clear_items()
             await interaction.message.edit(embed=embed, view=self)
@@ -178,15 +225,17 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
         await interaction.response.defer(ephemeral=True)
         
         try:
+            # Validar ID do FiveM
             if not self.id_fivem.value.isdigit():
                 await interaction.followup.send("❌ ID do FiveM deve conter apenas números!", ephemeral=True)
                 return
             
+            # Validar nick
             if not re.match(r'^[a-zA-Z0-9\s]+$', self.nick.value):
                 await interaction.followup.send("❌ Nick inválido! Use apenas letras e números.", ephemeral=True)
                 return
             
-            # Validar ID do recrutador (agora obrigatório)
+            # Validar ID do recrutador
             if not self.recrutador.value or not self.recrutador.value.strip():
                 await interaction.followup.send("❌ ID do recrutador é obrigatório!", ephemeral=True)
                 return
@@ -195,6 +244,14 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 await interaction.followup.send("❌ ID do recrutador deve conter apenas números!", ephemeral=True)
                 return
             
+            # VERIFICAR SE O ID DO FIVEM JÁ ESTÁ EM USO
+            disponivel, motivo, usuario_existente = verificar_id_disponivel(interaction.guild, self.id_fivem.value)
+            
+            if not disponivel:
+                await interaction.followup.send(motivo, ephemeral=True)
+                return
+            
+            # Verificar se canal de aprovação está configurado
             canal_id = canais_aprovacao.get(interaction.guild.id)
             if not canal_id:
                 await interaction.followup.send(
@@ -209,14 +266,15 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 await interaction.followup.send("❌ Canal de aprovação não encontrado!", ephemeral=True)
                 return
             
+            # Verificar se ID já existe em pedidos PENDENTES (não aprovados)
             async for message in canal.history(limit=200):
-                if message.embeds:
+                if message.embeds and "Aguardando aprovação" in (message.embeds[0].description or ""):
                     for embed in message.embeds:
                         if embed.description and f"**🎮 ID Fivem:** `{self.id_fivem.value}`" in embed.description:
-                            await interaction.followup.send(f"❌ ID `{self.id_fivem.value}` já está em uso!", ephemeral=True)
+                            await interaction.followup.send(f"❌ Já existe um pedido PENDENTE com o ID `{self.id_fivem.value}`!", ephemeral=True)
                             return
             
-            # Processar recrutador - VERIFICAR SE EXISTE
+            # Processar recrutador
             recrutador_member = buscar_usuario_por_id_fivem(interaction.guild, self.recrutador.value)
             
             # SE NÃO ENCONTRAR O RECRUTADOR, DAR ERRO
@@ -238,8 +296,8 @@ class SetForm(ui.Modal, title="📝 Pedido de Set"):
                 painel_cog.adicionar_recrutamento(
                     recrutador_member.id,
                     recrutador_nome,
-                    interaction.user.id,  # ID do recruta
-                    interaction.user.name  # Nome do recruta
+                    interaction.user.id,
+                    interaction.user.name
                 )
             
             descricao = (
@@ -323,18 +381,15 @@ class SetsCog(commands.Cog, name="Sets"):
             color=discord.Color.green()
         )
         
-        # Enviar mensagem de confirmação e guardar ela
         msg_confirmacao = await ctx.send(embed=embed)
         
-        # Aguardar 3 segundos
         await asyncio.sleep(3)
         
-        # Apagar o comando do usuário e a mensagem de confirmação
         try:
-            await ctx.message.delete()  # Apaga o !aprovamento
-            await msg_confirmacao.delete()  # Apaga a confirmação
+            await ctx.message.delete()
+            await msg_confirmacao.delete()
         except:
-            pass  # Se não conseguir apagar, ignora
+            pass
         
         print(f"✅ Canal de aprovação definido: #{canal.name} em {ctx.guild.name}")
     
@@ -349,23 +404,20 @@ class SetsCog(commands.Cog, name="Sets"):
                 description=(
                     "Use o comando `!aprovamento #canal` para definir onde os pedidos serão enviados.\n\n"
                     "**Exemplo:**\n"
-                    "`!aprovamento #𝐀𝐩𝐫𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐨`"
+                    "`!aprovamento #canal-de-aprovacao`"
                 ),
                 color=discord.Color.orange()
             )
             
-            # Enviar mensagem de aviso e guardar ela
             msg_aviso = await ctx.send(embed=embed_aviso)
             
-            # Aguardar 3 segundos
             await asyncio.sleep(3)
             
-            # Apagar o comando do usuário e a mensagem de aviso
             try:
-                await ctx.message.delete()  # Apaga o !setup_set
-                await msg_aviso.delete()    # Apaga o aviso
+                await ctx.message.delete()
+                await msg_aviso.delete()
             except:
-                pass  # Se não conseguir apagar, ignora
+                pass
             
             return
         
@@ -374,7 +426,7 @@ class SetsCog(commands.Cog, name="Sets"):
         embed = discord.Embed(
             title="🎮 **PEÇA SEU SET AQUI!**",
             description=(
-                "Clique no botão abaixo e preencha os dados:\n\n"
+                 "Clique no botão abaixo e preencha os dados:\n\n"
                 "aprovamento para receber seu set\n"
                 "personalizado no servidor.\n\n"
                 "**📌 Instruções:**\n"
@@ -389,7 +441,7 @@ class SetsCog(commands.Cog, name="Sets"):
         
         embed.add_field(
             name="🤝 Como encontrar ID do Recrutador?",
-            value="Procure no nickname da pessoa: `rec | Nome | 9237`\nO número após o último '|' é o ID do FiveM",
+            value="Procure no nickname da pessoa: `00| Torres | 9237`\nO número após o último '|' é o ID do FiveM",
             inline=False
         )
         
@@ -404,33 +456,30 @@ class SetsCog(commands.Cog, name="Sets"):
     async def check_id(self, ctx, id_fivem: str):
         """🔍 Verifica se um ID Fivem já está em uso"""
         
-        canal_id = canais_aprovacao.get(ctx.guild.id)
-        if not canal_id:
-            await ctx.send("❌ Canal de aprovação não configurado! Use `!aprovamento #canal` primeiro.")
-            return
-        
-        canal = ctx.guild.get_channel(canal_id)
-        if not canal:
-            await ctx.send("❌ Canal de aprovação não encontrado!")
-            return
-        
         if not id_fivem.isdigit():
             await ctx.send("❌ ID deve conter apenas números!")
             return
         
-        encontrado = False
-        async for message in canal.history(limit=200):
-            if message.embeds:
-                for embed in message.embeds:
-                    if embed.description and f"**🎮 ID Fivem:** `{id_fivem}`" in embed.description:
-                        await ctx.send(f"❌ ID `{id_fivem}` já está em uso! [Ver pedido]({message.jump_url})")
-                        encontrado = True
-                        break
-            if encontrado:
-                break
+        # Verificar nos nicknames primeiro
+        disponivel, motivo, membro = verificar_id_disponivel(ctx.guild, id_fivem)
         
-        if not encontrado:
-            await ctx.send(f"✅ ID `{id_fivem}` está disponível!")
+        if not disponivel:
+            await ctx.send(motivo)
+            return
+        
+        # Se não achou nos nicknames, verificar nos pedidos pendentes
+        canal_id = canais_aprovacao.get(ctx.guild.id)
+        if canal_id:
+            canal = ctx.guild.get_channel(canal_id)
+            if canal:
+                async for message in canal.history(limit=200):
+                    if message.embeds and "Aguardando aprovação" in (message.embeds[0].description or ""):
+                        for embed in message.embeds:
+                            if embed.description and f"**🎮 ID Fivem:** `{id_fivem}`" in embed.description:
+                                await ctx.send(f"❌ ID `{id_fivem}` tem um pedido pendente! [Ver]({message.jump_url})")
+                                return
+        
+        await ctx.send(f"✅ ID `{id_fivem}` está disponível!")
     
     @commands.command(name="sets_pendentes", aliases=["pendentes"])
     @commands.has_permissions(administrator=True)
