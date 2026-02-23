@@ -6,25 +6,25 @@ from datetime import datetime
 import re
 
 # ========== CONFIGURAÇÃO ==========
-# IDs dos cargos que podem usar comandos de limpeza
-CARGOS_PERMITIDOS = [
-    1474880677827579935,  # 👑 Lider 00
-    1474880748803723294,  # 💎 Lider 01
-    1474880750909128874,  # 👮 Lider 02
-    1474880752566014156,  # 🎖️ Lider 03
-    1474880754214371539,  # 🎖️ Gerente Geral
-    1474880755078533241,  # 🎖️ Gerente De Farm
-    1474880756026179825,  # 🎖️ Gerente De Pista
-    1474880756433162353,  # 🎖️ Gerente de Recrutamento
-    1474880757385134130,  # 🎖️ Supervisor
-    1474880757984923708,  # 🎖️ Recrutador
-    1474881051569688656,  # 🎖️ Ceo Elite
-    1474881053108731945,  # 🎖️ Sub Elite
+# Nomes dos cargos que podem usar comandos de limpeza
+STAFF_ROLES = [
+    "👑 | Lider | 00",
+    "💎 | Lider | 01",
+    "👮 | Lider | 02",
+    "🎖️ | Lider | 03",
+    "🎖️ | Gerente Geral",
+    "🎖️ | Gerente De Farm",
+    "🎖️ | Gerente De Pista",
+    "🎖️ | Gerente de Recrutamento",
+    "🎖️ | Supervisor",
+    "🎖️ | Recrutador",
+    "🎖️ | Ceo Elite",
+    "🎖️ | Sub Elite",
 ]
 
 # ========== FUNÇÕES AUXILIARES ==========
 def usuario_pode_limpar(member: discord.Member) -> bool:
-    """Verifica se o usuário pode usar comandos de limpeza"""
+    """Verifica se o usuário pode usar comandos de limpeza baseado nos cargos"""
     if not member:
         return False
     
@@ -32,16 +32,16 @@ def usuario_pode_limpar(member: discord.Member) -> bool:
     if member.guild_permissions.administrator:
         return True
     
-    # Verificar se tem cargo permitido
+    # Verificar se tem cargo de staff
     for role in member.roles:
-        if role.id in CARGOS_PERMITIDOS:
+        if role.name in STAFF_ROLES:
             return True
     
     return False
 
-# ========== VIEW DE CONFIRMAÇÃO ==========
+# ========== VIEW DE CONFIRMAÇÃO (APENAS PARA MENU) ==========
 class ConfirmarLimpezaView(ui.View):
-    """View para confirmar limpeza"""
+    """View para confirmar limpeza (usada apenas pelo menu !limpar)"""
     
     def __init__(self, cog, ctx, quantidade: int, canal: discord.TextChannel = None):
         super().__init__(timeout=30)
@@ -206,52 +206,78 @@ class LimpezaCog(commands.Cog):
         embed.add_field(
             name="📌 Comandos Rápidos",
             value=(
-                "`!limpar 10` - Apaga 10 mensagens\n"
-                "`!limpar 50` - Apaga 50 mensagens\n"
-                "`!limpar 100` - Apaga 100 mensagens\n"
-                "`!limpar canal #canal 20` - Apaga em outro canal"
+                "`!limpar 10` - Apaga 10 mensagens (SEM CONFIRMAÇÃO)\n"
+                "`!limpar 50` - Apaga 50 mensagens (SEM CONFIRMAÇÃO)\n"
+                "`!limpar 100` - Apaga 100 mensagens (SEM CONFIRMAÇÃO)\n"
+                "`!limpar canal #canal 20` - Apaga em outro canal (SEM CONFIRMAÇÃO)"
             ),
             inline=False
         )
         
-        embed.set_footer(text="Clique no botão para opções avançadas")
+        embed.set_footer(text="Use !limpar [quantidade] para limpeza direta • Clique no botão para opções avançadas")
         
         view = LimpezaView(self, ctx)
         await ctx.send(embed=embed, view=view)
     
     @limpar.command(name="rapido")
     async def limpar_rapido(self, ctx, quantidade: int, canal: discord.TextChannel = None):
-        """Limpeza rápida por quantidade"""
+        """Limpeza rápida por quantidade - SEM CONFIRMAÇÃO"""
         
         if not usuario_pode_limpar(ctx.author):
             await ctx.send("❌ Você não tem permissão!", delete_after=5)
             return
         
-        if quantidade < 1 or quantidade > 100:
-            await ctx.send("❌ Quantidade deve ser entre 1 e 100!", delete_after=5)
+        if quantidade < 1 or quantidade > 999:
+            await ctx.send("❌ Quantidade deve ser entre 1 e 999!", delete_after=5)
             return
         
         canal_alvo = canal or ctx.channel
         
-        embed = discord.Embed(
-            title="⚠️ Confirmar Limpeza",
-            description=(
-                f"**Canal:** {canal_alvo.mention}\n"
-                f"**Quantidade:** {quantidade} mensagens\n\n"
-                "Tem certeza que deseja continuar?"
-            ),
-            color=discord.Color.orange()
-        )
-        
-        view = ConfirmarLimpezaView(self, ctx, quantidade, canal_alvo)
-        await ctx.send(embed=embed, view=view)
+        # LIMPEZA DIRETA - SEM CONFIRMAÇÃO
+        await self.realizar_limpeza(ctx, quantidade, canal_alvo)
     
     @limpar.command(name="canal")
     async def limpar_canal(self, ctx, canal: discord.TextChannel, quantidade: int):
-        """Limpa mensagens em um canal específico"""
+        """Limpa mensagens em um canal específico - SEM CONFIRMAÇÃO"""
         await self.limpar_rapido(ctx, quantidade, canal)
+    
+    # Handler para chamadas diretas como !limpar 10
+    @limpar.error
+    async def limpar_error(self, ctx, error):
+        if isinstance(error, commands.BadArgument):
+            # Se não conseguir converter para int, mostra o menu
+            pass
+
+# Handler para comandos diretos (ex: !limpar 10)
+@commands.command(name="limpar_direto", aliases=["limpar"])
+async def limpar_direto(ctx, quantidade: int, canal: discord.TextChannel = None):
+    """Comando direto para limpeza rápida"""
+    
+    # Verificar permissão
+    if not usuario_pode_limpar(ctx.author):
+        await ctx.send("❌ Você não tem permissão!", delete_after=5)
+        return
+    
+    # Verificar quantidade
+    if quantidade < 1 or quantidade > 999:
+        await ctx.send("❌ Quantidade deve ser entre 1 e 999!", delete_after=5)
+        return
+    
+    # Buscar o cog
+    cog = ctx.bot.get_cog("LimpezaCog")
+    if not cog:
+        await ctx.send("❌ Erro no sistema de limpeza!", delete_after=5)
+        return
+    
+    canal_alvo = canal or ctx.channel
+    
+    # Limpeza direta - SEM CONFIRMAÇÃO
+    await cog.realizar_limpeza(ctx, quantidade, canal_alvo)
 
 # ========== SETUP ==========
 async def setup(bot):
+    # Adicionar o comando direto
+    bot.add_command(limpar_direto)
+    # Adicionar o cog
     await bot.add_cog(LimpezaCog(bot))
     print("✅ Sistema de Limpeza configurado!")
