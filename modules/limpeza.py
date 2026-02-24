@@ -39,9 +39,9 @@ def usuario_pode_limpar(member: discord.Member) -> bool:
     
     return False
 
-# ========== VIEW DE CONFIRMAÇÃO (APENAS PARA MENU) ==========
+# ========== VIEW DE CONFIRMAÇÃO ==========
 class ConfirmarLimpezaView(ui.View):
-    """View para confirmar limpeza (usada apenas pelo menu !limpar)"""
+    """View para confirmar limpeza"""
     
     def __init__(self, cog, ctx, quantidade: int, canal: discord.TextChannel = None):
         super().__init__(timeout=30)
@@ -138,7 +138,7 @@ class LimpezaQuantidadeModal(ui.Modal, title="🧹 Limpar por Quantidade"):
 
 # ========== VIEW PRINCIPAL ==========
 class LimpezaView(ui.View):
-    """View principal com apenas o botão de limpeza por quantidade"""
+    """View principal com botões"""
     
     def __init__(self, cog, ctx):
         super().__init__(timeout=60)
@@ -165,8 +165,8 @@ class LimpezaCog(commands.Cog):
     async def realizar_limpeza(self, ctx, quantidade: int, canal: discord.TextChannel):
         """Realiza a limpeza de mensagens"""
         try:
-            # Deletar mensagens
-            deleted = await canal.purge(limit=quantidade + 1)  # +1 para incluir o comando
+            # Deletar mensagens (incluindo o comando)
+            deleted = await canal.purge(limit=quantidade + 1)
             
             # Mensagem de confirmação
             embed = discord.Embed(
@@ -189,39 +189,61 @@ class LimpezaCog(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Erro: {e}", delete_after=5)
     
-    @commands.group(name="limpar", aliases=["clean", "clear"], invoke_without_command=True)
-    async def limpar(self, ctx):
-        """🧹 Comandos de limpeza de canais"""
+    @commands.command(name="limpar", aliases=["clean", "clear"])
+    async def limpar(self, ctx, quantidade: int = None, canal: discord.TextChannel = None):
+        """
+        🧹 Comando de limpeza
         
+        Uso:
+        !limpar           - Mostra menu interativo
+        !limpar 10        - Apaga 10 mensagens
+        !limpar 50 #canal - Apaga 50 mensagens em outro canal
+        !limpar 100       - Apaga 100 mensagens
+        """
+        
+        # Verificar permissão
         if not usuario_pode_limpar(ctx.author):
             await ctx.send("❌ Você não tem permissão para usar este comando!", delete_after=5)
             return
         
-        embed = discord.Embed(
-            title="🧹 Sistema de Limpeza",
-            description="Clique no botão abaixo para limpar mensagens:",
-            color=discord.Color.blue()
-        )
+        # Se não especificou quantidade, mostra menu interativo
+        if quantidade is None:
+            embed = discord.Embed(
+                title="🧹 Sistema de Limpeza",
+                description="Clique no botão abaixo para limpar mensagens:",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="📌 Uso Rápido",
+                value=(
+                    "`!limpar 10` - Apaga 10 mensagens\n"
+                    "`!limpar 50` - Apaga 50 mensagens\n"
+                    "`!limpar 100 #canal` - Apaga em outro canal"
+                ),
+                inline=False
+            )
+            
+            embed.set_footer(text="Use !limpar [quantidade] para limpeza direta")
+            
+            view = LimpezaView(self, ctx)
+            await ctx.send(embed=embed, view=view)
+            return
         
-        embed.add_field(
-            name="📌 Comandos Rápidos",
-            value=(
-                "`!limpar 10` - Apaga 10 mensagens (SEM CONFIRMAÇÃO)\n"
-                "`!limpar 50` - Apaga 50 mensagens (SEM CONFIRMAÇÃO)\n"
-                "`!limpar 100` - Apaga 100 mensagens (SEM CONFIRMAÇÃO)\n"
-                "`!limpar canal #canal 20` - Apaga em outro canal (SEM CONFIRMAÇÃO)"
-            ),
-            inline=False
-        )
+        # Verificar quantidade
+        if quantidade < 1 or quantidade > 999:
+            await ctx.send("❌ Quantidade deve ser entre 1 e 999!", delete_after=5)
+            return
         
-        embed.set_footer(text="Use !limpar [quantidade] para limpeza direta • Clique no botão para opções avançadas")
+        # Definir canal alvo
+        canal_alvo = canal or ctx.channel
         
-        view = LimpezaView(self, ctx)
-        await ctx.send(embed=embed, view=view)
+        # LIMPEZA DIRETA - SEM CONFIRMAÇÃO
+        await self.realizar_limpeza(ctx, quantidade, canal_alvo)
     
-    @limpar.command(name="rapido")
-    async def limpar_rapido(self, ctx, quantidade: int, canal: discord.TextChannel = None):
-        """Limpeza rápida por quantidade - SEM CONFIRMAÇÃO"""
+    @commands.command(name="limpar_confirmar")
+    async def limpar_com_confirmacao(self, ctx, quantidade: int, canal: discord.TextChannel = None):
+        """🧹 Limpa mensagens com confirmação"""
         
         if not usuario_pode_limpar(ctx.author):
             await ctx.send("❌ Você não tem permissão!", delete_after=5)
@@ -233,51 +255,21 @@ class LimpezaCog(commands.Cog):
         
         canal_alvo = canal or ctx.channel
         
-        # LIMPEZA DIRETA - SEM CONFIRMAÇÃO
-        await self.realizar_limpeza(ctx, quantidade, canal_alvo)
-    
-    @limpar.command(name="canal")
-    async def limpar_canal(self, ctx, canal: discord.TextChannel, quantidade: int):
-        """Limpa mensagens em um canal específico - SEM CONFIRMAÇÃO"""
-        await self.limpar_rapido(ctx, quantidade, canal)
-    
-    # Handler para chamadas diretas como !limpar 10
-    @limpar.error
-    async def limpar_error(self, ctx, error):
-        if isinstance(error, commands.BadArgument):
-            # Se não conseguir converter para int, mostra o menu
-            pass
-
-# Handler para comandos diretos (ex: !limpar 10)
-@commands.command(name="limpar_direto", aliases=["limpar"])
-async def limpar_direto(ctx, quantidade: int, canal: discord.TextChannel = None):
-    """Comando direto para limpeza rápida"""
-    
-    # Verificar permissão
-    if not usuario_pode_limpar(ctx.author):
-        await ctx.send("❌ Você não tem permissão!", delete_after=5)
-        return
-    
-    # Verificar quantidade
-    if quantidade < 1 or quantidade > 999:
-        await ctx.send("❌ Quantidade deve ser entre 1 e 999!", delete_after=5)
-        return
-    
-    # Buscar o cog
-    cog = ctx.bot.get_cog("LimpezaCog")
-    if not cog:
-        await ctx.send("❌ Erro no sistema de limpeza!", delete_after=5)
-        return
-    
-    canal_alvo = canal or ctx.channel
-    
-    # Limpeza direta - SEM CONFIRMAÇÃO
-    await cog.realizar_limpeza(ctx, quantidade, canal_alvo)
+        # Mostrar confirmação
+        embed = discord.Embed(
+            title="⚠️ Confirmar Limpeza",
+            description=(
+                f"**Canal:** {canal_alvo.mention}\n"
+                f"**Quantidade:** {quantidade} mensagens\n\n"
+                "Tem certeza que deseja continuar?"
+            ),
+            color=discord.Color.orange()
+        )
+        
+        view = ConfirmarLimpezaView(self, ctx, quantidade, canal_alvo)
+        await ctx.send(embed=embed, view=view)
 
 # ========== SETUP ==========
 async def setup(bot):
-    # Adicionar o comando direto
-    bot.add_command(limpar_direto)
-    # Adicionar o cog
     await bot.add_cog(LimpezaCog(bot))
     print("✅ Sistema de Limpeza configurado!")
