@@ -6,13 +6,10 @@ from datetime import datetime
 import json
 import os
 import re
-import math
 
 # ========== CONFIGURAÇÃO ==========
-# Arquivo para salvar o painel
 ARQUIVO_PAINEIS = "paineis_hierarquia.json"
 
-# Mapeamento de nomes de cargos REAIS para exibição (em ORDEM DECRESCENTE - do maior para o menor)
 CARGOS_REAIS = [
     {"nome": "👑 | Lider | 00", "display": "Lider 00", "emoji": "👑", "prioridade": 1},
     {"nome": "💎 | Lider | 01", "display": "Lider 01", "emoji": "💎", "prioridade": 2},
@@ -31,7 +28,6 @@ CARGOS_REAIS = [
 ]
 
 def normalizar_para_comparacao(texto: str) -> str:
-    """Remove tudo que não é letra ou número para comparação"""
     if not texto:
         return ""
     texto_limpo = re.sub(r'[^\w\s]', '', texto)
@@ -46,17 +42,45 @@ def encontrar_cargo_mais_alto(member, cargos_config):
         if role.name == "@everyone":
             continue
             
+        role_nome = role.name.lower()
+        
+        # VERIFICAÇÃO ESPECÍFICA PARA ELITES
+        if "ceo" in role_nome and "elite" in role_nome:
+            cargos_membro.append({
+                "display": "Ceo Elite",
+                "emoji": "👑",
+                "prioridade": 11
+            })
+            continue
+            
+        if "sub" in role_nome and "elite" in role_nome:
+            cargos_membro.append({
+                "display": "Sub Elite",
+                "emoji": "⭐",
+                "prioridade": 12
+            })
+            continue
+            
+        if "elite" in role_nome and "sub" not in role_nome and "ceo" not in role_nome:
+            cargos_membro.append({
+                "display": "Elite",
+                "emoji": "✨",
+                "prioridade": 13
+            })
+            continue
+        
+        # Para os outros cargos
         role_normalizado = normalizar_para_comparacao(role.name)
         
         for cargo_info in cargos_config:
+            if cargo_info["display"] in ["Ceo Elite", "Sub Elite", "Elite"]:
+                continue
+                
             cargo_normalizado = normalizar_para_comparacao(cargo_info["nome"])
             
             if (role_normalizado == cargo_normalizado or 
                 cargo_normalizado in role_normalizado or 
-                role_normalizado in cargo_normalizado or
-                (cargo_info["display"] == "Elite" and "elite" in role_normalizado and "sub" not in role_normalizado and "ceo" not in role_normalizado) or
-                (cargo_info["display"] == "Sub Elite" and "subelite" in role_normalizado) or
-                (cargo_info["display"] == "Ceo Elite" and "ceoelite" in role_normalizado)):
+                role_normalizado in cargo_normalizado):
                 
                 cargos_membro.append({
                     "display": cargo_info["display"],
@@ -71,16 +95,12 @@ def encontrar_cargo_mais_alto(member, cargos_config):
     cargos_membro.sort(key=lambda x: x["prioridade"])
     return cargos_membro[0]
 
-# ========== VIEW DO PAINEL ==========
 class PainelHierarquiaView(ui.View):
-    """View com botão para atualizar"""
-    
     def __init__(self):
         super().__init__(timeout=None)
     
     @ui.button(label="🔄 Atualizar", style=ButtonStyle.primary, emoji="🔄", custom_id="hierarquia_atualizar")
     async def atualizar(self, interaction: discord.Interaction, button: ui.Button):
-        """Atualiza o painel manualmente"""
         cog = interaction.client.get_cog("PainelHierarquia")
         if not cog:
             await interaction.response.send_message("❌ Erro ao atualizar painel!", ephemeral=True)
@@ -88,37 +108,30 @@ class PainelHierarquiaView(ui.View):
         
         await interaction.response.defer()
         
-        # Apaga todas as mensagens antigas do painel
-        channel = interaction.channel
-        async for msg in channel.history(limit=50):
+        async for msg in interaction.channel.history(limit=50):
             if msg.author == interaction.client.user and msg.embeds:
                 for embed in msg.embeds:
                     if embed.title and any(t in embed.title for t in ["LIDERANÇA", "GERÊNCIA", "SUPERVISÃO", "ELITES", "MEMBROS", "TOTAL"]):
                         await msg.delete()
                         break
         
-        # Envia novo painel
         embeds = cog.criar_embeds_hierarquia(interaction.guild)
-        mensagens = await cog.enviar_multiplas_mensagens(channel, embeds, view=self)
+        mensagens = await cog.enviar_multiplas_mensagens(interaction.channel, embeds, view=self)
         
         if mensagens:
             cog.paineis_ativos[str(interaction.guild.id)] = {
-                "canal_id": channel.id,
+                "canal_id": interaction.channel.id,
                 "mensagem_id": mensagens[0].id
             }
             cog.salvar_paineis()
 
-# ========== COG PRINCIPAL ==========
 class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
-    """Sistema de Painel de Hierarquia"""
-    
     def __init__(self, bot):
         self.bot = bot
         self.paineis_ativos = {}
         print("✅ Módulo PainelHierarquia carregado!")
     
     async def enviar_multiplas_mensagens(self, channel, embeds, view=None):
-        """Envia múltiplos embeds, respeitando limite de 10 por mensagem"""
         mensagens = []
         embeds_atual = []
         
@@ -139,14 +152,8 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
         return mensagens
     
     def criar_embeds_hierarquia(self, guild):
-        """Cria os embeds com a hierarquia completa"""
-        
-        print(f"\n📊 GERANDO HIERARQUIA para {guild.name}")
-        
-        # Dicionário para armazenar membros por cargo
         membros_por_cargo = {cargo["display"]: [] for cargo in CARGOS_REAIS}
         
-        # Coletar membros por cargo
         for member in guild.members:
             if member.bot:
                 continue
@@ -155,167 +162,84 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
             if cargo_mais_alto:
                 membros_por_cargo[cargo_mais_alto["display"]].append(member)
         
-        # Lista de todos os embeds
         todos_embeds = []
         
-        # ========== LIDERANÇA ==========
-        embed1 = discord.Embed(
-            title="👑 **LIDERANÇA**",
-            description="Estrutura de liderança do servidor",
-            color=discord.Color.gold()
-        )
-        
+        # LIDERANÇA
+        embed1 = discord.Embed(title="👑 **LIDERANÇA**", color=discord.Color.gold())
         for idx in [0, 1, 2, 3]:
             cargo = CARGOS_REAIS[idx]
             membros = membros_por_cargo[cargo["display"]]
-            
-            if membros:
-                valor = " ".join([m.mention for m in membros])
-            else:
-                valor = "`Lugar Disponível`"
-            
-            embed1.add_field(
-                name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`",
-                value=valor,
-                inline=False
-            )
+            valor = " ".join([m.mention for m in membros]) if membros else "`Lugar Disponível`"
+            embed1.add_field(name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`", value=valor, inline=False)
         todos_embeds.append(embed1)
         
-        # ========== GERÊNCIA ==========
-        embed2 = discord.Embed(
-            title="📊 **GERÊNCIA**",
-            description="Gerentes do servidor",
-            color=discord.Color.blue()
-        )
-        
+        # GERÊNCIA
+        embed2 = discord.Embed(title="📊 **GERÊNCIA**", color=discord.Color.blue())
         for idx in [4, 5, 6, 7]:
             cargo = CARGOS_REAIS[idx]
             membros = membros_por_cargo[cargo["display"]]
-            
-            if membros:
-                valor = " ".join([m.mention for m in membros])
-            else:
-                valor = "`Lugar Disponível`"
-            
-            embed2.add_field(
-                name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`",
-                value=valor,
-                inline=False
-            )
+            valor = " ".join([m.mention for m in membros]) if membros else "`Lugar Disponível`"
+            embed2.add_field(name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`", value=valor, inline=False)
         todos_embeds.append(embed2)
         
-        # ========== SUPERVISÃO ==========
-        embed3 = discord.Embed(
-            title="🔍 **SUPERVISÃO**",
-            description="Supervisores e recrutadores",
-            color=discord.Color.green()
-        )
-        
+        # SUPERVISÃO
+        embed3 = discord.Embed(title="🔍 **SUPERVISÃO**", color=discord.Color.green())
         for idx in [8, 9]:
             cargo = CARGOS_REAIS[idx]
             membros = membros_por_cargo[cargo["display"]]
-            
-            if membros:
-                valor = " ".join([m.mention for m in membros])
-            else:
-                valor = "`Lugar Disponível`"
-            
-            embed3.add_field(
-                name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`",
-                value=valor,
-                inline=False
-            )
+            valor = " ".join([m.mention for m in membros]) if membros else "`Lugar Disponível`"
+            embed3.add_field(name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`", value=valor, inline=False)
         todos_embeds.append(embed3)
         
-        # ========== ELITES ==========
-        embed4 = discord.Embed(
-            title="👑 **ELITES**",
-            description="Ceo Elite, Sub Elite e Elite",
-            color=discord.Color.purple()
-        )
-        
+        # ELITES
+        embed4 = discord.Embed(title="👑 **ELITES**", color=discord.Color.purple())
         for idx in [10, 11, 12]:
             cargo = CARGOS_REAIS[idx]
             membros = membros_por_cargo[cargo["display"]]
-            
-            if membros:
-                valor = " ".join([m.mention for m in membros])
-            else:
-                valor = "`Lugar Disponível`"
-            
-            embed4.add_field(
-                name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`",
-                value=valor,
-                inline=False
-            )
+            print(f"  {cargo['display']}: {len(membros)} membros")
+            valor = " ".join([m.mention for m in membros]) if membros else "`Lugar Disponível`"
+            embed4.add_field(name=f"{cargo['emoji']} **{cargo['display']}** ─ `{len(membros)}`", value=valor, inline=False)
         todos_embeds.append(embed4)
         
-        # ========== MEMBROS (COM MÚLTIPLAS MENSAGENS) ==========
+        # MEMBROS
         cargo_membro = CARGOS_REAIS[13]
         membros_membro = membros_por_cargo[cargo_membro["display"]]
         
-        print(f"\n📝 MEMBROS: {len(membros_membro)} encontrados")
-        
         if membros_membro:
-            # Ordena membros
             membros_membro.sort(key=lambda m: m.name.lower())
-            
             texto_atual = ""
             numero_mensagem = 1
             
             for i, membro in enumerate(membros_membro, 1):
                 mencao = f"{membro.mention} "
                 
-                # Se passar do limite, cria nova mensagem
                 if len(texto_atual + mencao) > 900:
                     titulo = "**MEMBROS:**" if numero_mensagem == 1 else f"**MEMBROS {numero_mensagem}:**"
-                    embed = discord.Embed(
-                        title=titulo,
-                        description=texto_atual,
-                        color=discord.Color.light_grey()
-                    )
+                    embed = discord.Embed(title=titulo, description=texto_atual, color=discord.Color.light_grey())
                     todos_embeds.append(embed)
                     
-                    # Prepara próxima mensagem
                     numero_mensagem += 1
                     texto_atual = mencao
                 else:
                     texto_atual += mencao
-                    
-                # Adiciona quebra de linha a cada 5 membros
+                
                 if i % 5 == 0:
                     texto_atual += "\n"
             
-            # Última mensagem
             if texto_atual:
                 titulo = "**MEMBROS:**" if numero_mensagem == 1 else f"**MEMBROS {numero_mensagem}:**"
-                embed = discord.Embed(
-                    title=titulo,
-                    description=texto_atual,
-                    color=discord.Color.light_grey()
-                )
+                embed = discord.Embed(title=titulo, description=texto_atual, color=discord.Color.light_grey())
                 todos_embeds.append(embed)
         else:
-            # Sem membros
-            embed = discord.Embed(
-                title="**MEMBROS:**",
-                description="`Lugar Disponível`",
-                color=discord.Color.light_grey()
-            )
+            embed = discord.Embed(title="**MEMBROS:**", description="`Lugar Disponível`", color=discord.Color.light_grey())
             todos_embeds.append(embed)
         
-        # ========== TOTAL ==========
+        # TOTAL
         total_membros = sum(len(membros) for membros in membros_por_cargo.values())
-        embed_total = discord.Embed(
-            title="📊 **TOTAL**",
-            description=f"**{total_membros}** membros no servidor",
-            color=discord.Color.blue()
-        )
+        embed_total = discord.Embed(title="📊 **TOTAL**", description=f"**{total_membros}** membros no servidor", color=discord.Color.blue())
         embed_total.set_footer(text=f"Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-        embed_total.timestamp = datetime.now()
         todos_embeds.append(embed_total)
         
-        print(f"✅ Total de embeds criados: {len(todos_embeds)}")
         return todos_embeds
     
     @commands.Cog.listener()
@@ -342,8 +266,6 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
                 with open(ARQUIVO_PAINEIS, 'r', encoding='utf-8') as f:
                     self.paineis_ativos = json.load(f)
                 
-                print(f"📋 Carregando {len(self.paineis_ativos)} painéis...")
-                
                 for guild_id, dados in list(self.paineis_ativos.items()):
                     try:
                         guild = self.bot.get_guild(int(guild_id))
@@ -364,8 +286,7 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
                         continue
                 
                 self.salvar_paineis()
-        except Exception as e:
-            print(f"Erro ao carregar painéis: {e}")
+        except:
             self.paineis_ativos = {}
     
     def salvar_paineis(self):
@@ -392,7 +313,6 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
                 return
             
             try:
-                # Apaga todas as mensagens antigas do painel
                 async for msg in canal.history(limit=50):
                     if msg.author == self.bot.user and msg.embeds:
                         for embed in msg.embeds:
@@ -400,17 +320,13 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
                                 await msg.delete()
                                 break
                 
-                # Envia novo painel
                 embeds = self.criar_embeds_hierarquia(guild)
                 mensagens = await self.enviar_multiplas_mensagens(canal, embeds, view=PainelHierarquiaView())
                 
                 if mensagens:
                     self.paineis_ativos[str(guild.id)]["mensagem_id"] = mensagens[0].id
                     self.salvar_paineis()
-                    
-                    print(f"  ✅ Painel atualizado em #{canal.name} com {len(mensagens)} mensagens")
-            except Exception as e:
-                print(f"Erro ao atualizar painel: {e}")
+            except:
                 del self.paineis_ativos[str(guild.id)]
                 self.salvar_paineis()
         except:
@@ -419,19 +335,12 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
     @commands.command(name="setup_hierarquia", aliases=["hierarquia"])
     @commands.has_permissions(administrator=True)
     async def setup_hierarquia(self, ctx):
-        """📋 Configura o painel de hierarquia no canal atual"""
-        
         if not ctx.guild:
             await ctx.send("❌ Este comando só pode ser usado em servidores!")
             return
         
         if str(ctx.guild.id) in self.paineis_ativos:
-            embed_confirm = discord.Embed(
-                title="⚠️ Painel já existente",
-                description="Já existe um painel configurado. Deseja substituir?",
-                color=discord.Color.orange()
-            )
-            
+            embed_confirm = discord.Embed(title="⚠️ Painel já existente", description="Já existe um painel configurado. Deseja substituir?", color=discord.Color.orange())
             view = ConfirmaSubstituirView(self, ctx)
             await ctx.send(embed=embed_confirm, view=view)
             return
@@ -450,7 +359,6 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
                 }
                 self.salvar_paineis()
                 
-                # Adiciona view em todas as mensagens
                 for msg in mensagens:
                     self.bot.add_view(PainelHierarquiaView(), message_id=msg.id)
                 
@@ -460,9 +368,7 @@ class PainelHierarquia(commands.Cog, name="PainelHierarquia"):
                 await ctx.message.delete()
         except Exception as e:
             await ctx.send(f"❌ Erro ao criar painel: {str(e)}")
-            print(f"Erro ao criar painel: {e}")
 
-# ========== VIEW DE CONFIRMAÇÃO ==========
 class ConfirmaSubstituirView(ui.View):
     def __init__(self, cog, ctx):
         super().__init__(timeout=30)
@@ -494,7 +400,6 @@ class ConfirmaSubstituirView(ui.View):
         await interaction.message.delete()
         await self.ctx.send("❌ Operação cancelada.", delete_after=3)
 
-# ========== SETUP ==========
 async def setup(bot):
     await bot.add_cog(PainelHierarquia(bot))
     print("✅ Sistema de Painel de Hierarquia configurado!")
